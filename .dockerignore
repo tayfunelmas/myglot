@@ -1,0 +1,11 @@
+data/
+secrets/
+.env
+__pycache__/
+*.pyc
+.git/
+.venv/
+venv/
+.idea/
+.vscode/
+*.md

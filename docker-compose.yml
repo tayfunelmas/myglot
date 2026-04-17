@@ -1,0 +1,19 @@
+services:
+  myglot:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: myglot
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - .env
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /app/secrets/gcp.json
+      MYGLOT_DATA_DIR: /app/data
+      MYGLOT_HOST: "0.0.0.0"
+      MYGLOT_PORT: "8000"
+    volumes:
+      - ./data:/app/data
+      - ./secrets:/app/secrets:ro
+    restart: unless-stopped

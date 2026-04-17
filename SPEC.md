@@ -1,0 +1,879 @@
+# MyGlot — Specification & Design
+
+A personal, single-user web app for learning a target language by accumulating and practicing your own most-used words, phrases, and sentences.
+
+> **Status:** Draft for review. Please edit inline or leave comments before implementation starts.
+
+---
+
+## 1. Goals & Non-Goals
+
+### 1.1 Goals
+- Let the user maintain a personal corpus of **items** (word / phrase / sentence) in their **source language**.
+- Use **Google Translate** to translate each item to the **target language**.
+- Use **Google Text-to-Speech (TTS)** to generate audio of the target-language text.
+- Persist source text, target text, and audio so they don't need to be regenerated.
+- Allow **editing the target text** and **regenerating audio** on demand.
+- Provide a **practice view** listing all items with play, record, and compare features.
+- Use **Google Speech-to-Text (STT)** to transcribe the user's spoken attempt and **compare** it to the stored target text, giving a similarity score.
+- Allow **downloading** the audio file for any item.
+- Let the user organize items into **categories** (e.g. "Greetings", "At the restaurant") and filter by category when practicing.
+
+### 1.2 Non-Goals (for v1)
+- Multi-user / auth / cloud sync.
+- Spaced-repetition scheduling (SRS), gamification, streaks.
+- Mobile-native app (web only; mobile browser should work).
+- Offline mode.
+- Multiple target languages per item (one source lang + one target lang configured globally; can be changed later).
+- Grammar analysis, conjugation drills.
+
+### 1.3 Assumptions
+- Single local user on `localhost` (or a personal server).
+- User has a **Google Cloud project** with Translate, TTS, and STT APIs enabled and a service-account JSON key available.
+- Internet access is available for API calls; existing items (with cached audio) can be practiced offline.
+
+---
+
+## 2. Primary User Flows
+
+### 2.1 Configure languages
+1. User opens Settings.
+2. Sets **source language** (e.g., `en`) and **target language** (e.g., `de`).
+3. Optionally picks a **TTS voice** for the target language (dropdown populated from Google TTS).
+4. Saves. Settings are persisted.
+
+### 2.2 Add a new item
+1. User types source text into an input on the Home page.
+2. Optionally selects a **category** from a dropdown (or types a new one to create it inline).
+3. Clicks **Translate & Generate Audio**.
+4. Backend:
+   - Calls Google Translate (`source → target`).
+   - Calls Google TTS on the translated text → saves MP3 to filesystem.
+   - If a new category name was provided, creates the `category` row first.
+   - Inserts DB row with `source_text`, `target_text`, `audio_path`, `category_id`, timestamps, languages, voice.
+5. UI shows the new item at the top of the list.
+
+### 2.3 Edit translation & regenerate audio
+1. In an item's detail/edit view, user edits `target_text`.
+2. Saves → DB row updated, `audio_stale = true`.
+3. User clicks **Regenerate audio** → backend re-runs TTS, replaces the MP3 file, sets `audio_stale = false`.
+
+### 2.4 Practice
+1. User opens **Practice**.
+2. Optionally selects a **category** filter (dropdown at the top). Selecting "All" shows everything; selecting a specific category shows only its items.
+3. Sees a list (or one-at-a-time card view, toggle) of the filtered items:
+   - Source text.
+   - Target text (**hidden by default**; press a **Reveal** button to show it).
+   - **▶ Play** button (plays stored MP3).
+   - **🎤 Record** button (records mic audio in browser, sends to backend).
+   - Backend runs STT → returns transcript + similarity score (ephemeral — not persisted).
+   - UI shows: your transcript, the expected target text, a score (0–100), and a diff highlighting mismatched words. The score is displayed until the user navigates away; it is not saved.
+3. User can **Download audio** (MP3) per item.
+
+### 2.5 Manage categories
+- User can create, rename, and delete categories from the **Home** page or a dedicated section.
+- Deleting a category does **not** delete its items — they become uncategorized (`category_id = NULL`).
+- Items can be moved between categories (change category via edit).
+
+### 2.6 Manage items
+- Search / filter by source or target text, **and/or by category**.
+- Delete an item (removes DB row + audio file).
+- Change an item's category.
+
+---
+
+## 3. Functional Requirements
+
+| ID | Requirement |
+|----|-------------|
+| F1 | CRUD for items: create, list, get, update (target text and category; source is immutable after create to keep history simple), delete. |
+| F1b | CRUD for categories: create, list, rename, delete (soft — items become uncategorized). |
+| F2 | Translate endpoint: given source text + lang pair → target text (no persistence; used internally on create). |
+| F3 | TTS endpoint: given text + lang + voice → MP3 file stored on disk, path saved on item. |
+| F4 | STT endpoint: accepts uploaded audio blob + expected target lang → returns transcript. |
+| F5 | Similarity scoring: server computes normalized similarity between transcript and stored target text (see §6.4). |
+| F6 | Settings: persist source lang, target lang, voice. |
+| F7 | Audio download endpoint serving the stored MP3 with correct `Content-Type` and `Content-Disposition`. |
+| F8 | Regenerate audio endpoint for an item. |
+| F9 | List voices endpoint (proxies Google TTS `ListVoices`, filtered by target lang). |
+
+## 4. Non-Functional Requirements
+- **Simplicity:** minimal dependencies; easy to run with one command.
+- **Portability:** works on macOS/Linux; Python 3.11+.
+- **Cost safety:** no auto-retranslation loops; TTS/Translate only called on explicit user action.
+- **Privacy:** all data local; only text/audio sent to Google APIs on demand.
+- **Latency:** add-item round-trip < ~3s typical for a short sentence.
+
+---
+
+## 5. Architecture Overview
+
+```
+┌─────────────────────────┐      HTTP/JSON      ┌──────────────────────────┐
+│   Browser (frontend)    │  ────────────────▶  │   Python backend (API)   │
+│   Vanilla HTML + JS     │                     │   FastAPI + Uvicorn      │
+│   (+ a little CSS)      │  ◀────────────────  │                          │
+└─────────────────────────┘                     │  - Routes                │
+        │  MediaRecorder (mic)                  │  - Services              │
+        │  <audio> playback                     │  - SQLite via SQLModel   │
+        ▼                                        │  - Audio files on disk   │
+                                                 └──────────────┬───────────┘
+                                                                │
+                                                                ▼
+                                                ┌──────────────────────────┐
+                                                │  Google Cloud APIs       │
+                                                │  - Translate v3          │
+                                                │  - Text-to-Speech        │
+                                                │  - Speech-to-Text        │
+                                                └──────────────────────────┘
+```
+
+### 5.1 Tech choices
+- **Backend:** Python 3.11, **FastAPI**, Uvicorn, **SQLModel** (SQLAlchemy + Pydantic), SQLite.
+- **External AI providers:** pluggable behind abstract interfaces (see §8.1). Default stack is **Google Cloud** (Translate v3, Text-to-Speech, Speech-to-Text); alternative implementations (OpenAI, Deepgram, …) can be swapped in via config without code changes in routes.
+- **Frontend:** Plain HTML + vanilla JS ES modules. No build step. One small CSS file. (Could swap to Alpine.js or HTMX later; kept vanilla to stay simple.)
+- **DB:** SQLite file at `data/myglot.db`.
+- **Audio storage:** `data/audio/<uuid>.mp3`.
+- **Config:** `.env` file (python-dotenv) with `GOOGLE_APPLICATION_CREDENTIALS` path and optional defaults.
+
+### 5.2 Why these choices
+- FastAPI: auto docs, simple async, type-safe.
+- SQLModel + SQLite: zero setup, single file, sufficient for a personal corpus up to ~tens of thousands of rows.
+- Vanilla JS: no toolchain, matches the "simple frontend" requirement.
+
+---
+
+## 6. Data Model
+
+### 6.1 SQLite schema (via SQLModel)
+
+**Table: `category`**
+
+| Column       | Type        | Notes |
+|--------------|-------------|-------|
+| `id`         | INTEGER PK  | autoincrement |
+| `name`       | TEXT        | NOT NULL, UNIQUE, e.g. "Greetings" |
+| `created_at` | DATETIME    | UTC |
+
+**Table: `item`**
+
+| Column         | Type        | Notes |
+|----------------|-------------|-------|
+| `id`           | INTEGER PK  | autoincrement |
+| `category_id`  | INTEGER FK  | → `category.id`, nullable (uncategorized), ON DELETE SET NULL |
+| `source_lang`  | TEXT        | BCP-47, e.g. `en` |
+| `target_lang`  | TEXT        | BCP-47, e.g. `de` |
+| `source_text`  | TEXT        | NOT NULL, user input |
+| `target_text`  | TEXT        | NOT NULL, translated/edited |
+| `audio_path`   | TEXT        | relative path under `data/audio/`, nullable if generation failed |
+| `audio_voice`  | TEXT        | voice name used (e.g. `de-DE-Wavenet-B`) |
+| `audio_stale`  | BOOLEAN     | true if target_text changed after last TTS |
+| `created_at`   | DATETIME    | UTC |
+| `updated_at`   | DATETIME    | UTC |
+
+**Table: `settings`** (single row, `id=1`)
+
+| Column        | Type   | Notes |
+|---------------|--------|-------|
+| `id`          | INT PK | always 1 |
+| `source_lang` | TEXT   | default `en` |
+| `target_lang` | TEXT   | default `de` |
+| `tts_voice`   | TEXT   | default null → server picks default for `target_lang` |
+
+### 6.2 Filesystem layout
+```
+data/
+  myglot.db
+  audio/
+    <item-uuid>.mp3     # generated TTS output
+```
+
+Audio filename uses a UUID (not the item id) so regeneration can atomically write a new file, then update the DB, then delete the old file.
+
+### 6.3 Language codes
+- Translate API uses ISO-639-1 (e.g., `en`, `de`, `tr`).
+- TTS/STT use BCP-47 (e.g., `en-US`, `de-DE`, `tr-TR`).
+- Settings stores **both** fields per lang, or a small lookup table maps `en → en-US`. For simplicity, store the BCP-47 form and derive the 2-letter code for Translate by splitting on `-`.
+
+### 6.4 Similarity scoring
+- Normalize both strings: lowercase, strip punctuation, collapse whitespace, Unicode NFC.
+- Compute two numbers:
+  - **Char-level ratio:** `difflib.SequenceMatcher(None, a, b).ratio()` → handles minor typos/accents.
+  - **Word-level F1** over tokenized words.
+- Final score = `round(100 * max(char_ratio, word_f1))`.
+- Also return a word-diff (`[{word, status: "match"|"missing"|"extra"|"wrong"}]`) for UI highlighting.
+
+---
+
+## 7. REST API
+
+Base path: `/api`. All JSON unless noted.
+
+| Method | Path                         | Body / Query                                                | Response |
+|--------|------------------------------|-------------------------------------------------------------|----------|
+| GET    | `/api/health`                | —                                                           | `{status:"ok"}` |
+| GET    | `/api/settings`              | —                                                           | Settings |
+| PUT    | `/api/settings`              | `{source_lang, target_lang, tts_voice?}`                    | Settings |
+| GET    | `/api/voices?lang=de-DE`     | —                                                           | `[{name, gender, natural_sample_rate}]` |
+| GET    | `/api/categories`            | —                                                           | `[{id, name, item_count}]` |
+| POST   | `/api/categories`            | `{name}`                                                    | `Category` |
+| PATCH  | `/api/categories/{id}`       | `{name}`                                                    | `Category` |
+| DELETE | `/api/categories/{id}`       | —                                                           | `204` (items become uncategorized) |
+| GET    | `/api/items?q=&category_id=&limit=&offset=` | —                                                | `{items:[Item], total}` |
+| POST   | `/api/items`                 | `{source_text, category_id?}` (uses current settings for langs/voice) | `Item` (with `target_text`, `audio_url`) |
+| GET    | `/api/items/{id}`            | —                                                           | `Item` |
+| PATCH  | `/api/items/{id}`            | `{target_text?, category_id?}`                              | `Item` (sets `audio_stale=true` if `target_text` changed) |
+| POST   | `/api/items/{id}/regenerate-audio` | —                                                     | `Item` (fresh `audio_url`, `audio_stale=false`) |
+| DELETE | `/api/items/{id}`            | —                                                           | `204` |
+| GET    | `/api/items/{id}/audio`      | —                                                           | `audio/mpeg` (inline) |
+| GET    | `/api/items/{id}/audio?download=1` | —                                                     | `audio/mpeg` (attachment) |
+| POST   | `/api/items/{id}/practice`   | multipart: `audio` (webm/ogg/wav)                           | `{transcript, score, diff:[...]}` |
+
+### Item DTO
+```json
+{
+  "id": 42,
+  "source_lang": "en",
+  "target_lang": "de-DE",
+  "source_text": "Good morning",
+  "target_text": "Guten Morgen",
+  "audio_url": "/api/items/42/audio",
+  "audio_voice": "de-DE-Wavenet-B",
+  "audio_stale": false,
+  "category": {"id": 3, "name": "Greetings"},
+  "created_at": "2026-04-17T10:00:00Z",
+  "updated_at": "2026-04-17T10:00:02Z"
+}
+```
+
+### Errors
+Uniform envelope:
+```json
+{ "error": { "code": "GOOGLE_API_ERROR", "message": "..." } }
+```
+Common codes: `VALIDATION_ERROR`, `NOT_FOUND`, `GOOGLE_API_ERROR`, `AUDIO_MISSING`.
+
+---
+
+## 8. Backend Module Layout
+
+```
+backend/
+  app/
+    main.py                 # FastAPI app + static mount for frontend
+    config.py               # env + settings
+    db.py                   # SQLModel engine, session
+    models.py               # Item, Settings, Category
+    schemas.py              # Pydantic DTOs
+    routes/
+      items.py
+      categories.py
+      settings.py
+      voices.py
+      health.py
+    providers/              # pluggable external services (see §8.1)
+      __init__.py           # registry + factory
+      base.py               # abstract interfaces + DTOs
+      google/
+        translate.py
+        tts.py
+        stt.py
+      openai/               # optional, v1.1
+        translate.py
+        tts.py
+        stt.py
+      deepgram/             # optional, v1.1
+        stt.py
+      fake/                 # in-memory stubs for tests / offline dev
+        translate.py
+        tts.py
+        stt.py
+    services/
+      similarity.py         # scoring + diff (pure, no provider)
+      audio_store.py        # paths, atomic replace, delete
+    errors.py
+  tests/
+    test_similarity.py
+    test_items_api.py       # uses FakeProviders, no network
+    test_providers_google.py  # marked @network, opt-in
+  pyproject.toml
+  .env.example
+```
+
+### 8.1 Provider abstraction
+
+Translation, TTS, and STT are each defined as an **abstract interface** (Python `Protocol` / ABC). Route handlers depend only on these interfaces, resolved via FastAPI dependency injection. Concrete implementations live under `app/providers/<vendor>/` and are selected at startup from config.
+
+```python
+# app/providers/base.py
+from typing import Protocol, Literal
+
+class Translator(Protocol):
+    name: str
+    def translate(self, text: str, source_lang: str, target_lang: str) -> str: ...
+
+class Voice(BaseModel):
+    id: str                 # provider-specific voice id, opaque to the app
+    display_name: str
+    gender: Literal["male", "female", "neutral", "unknown"] = "unknown"
+    lang: str               # BCP-47
+    provider: str
+
+class TTSResult(BaseModel):
+    audio_bytes: bytes
+    mime: str               # e.g. "audio/mpeg"
+    voice_id: str           # what was actually used (after defaulting)
+
+class TTS(Protocol):
+    name: str
+    def synthesize(self, text: str, lang: str, voice_id: str | None) -> TTSResult: ...
+    def list_voices(self, lang: str) -> list[Voice]: ...
+
+class STTResult(BaseModel):
+    transcript: str
+    confidence: float | None = None
+
+class STT(Protocol):
+    name: str
+    # mime examples: "audio/webm;codecs=opus", "audio/wav"
+    def transcribe(self, audio_bytes: bytes, mime: str, lang: str) -> STTResult: ...
+
+class ProviderError(Exception): ...        # wraps vendor SDK errors uniformly
+class ProviderNotConfigured(ProviderError): ...
+```
+
+Rules for implementations:
+- Each concrete class (`GoogleTranslator`, `OpenAITTS`, `DeepgramSTT`, …) **must** accept its config (API key, endpoint overrides) via constructor and do all I/O internally — no globals.
+- They must raise `ProviderError` (with a human message) on failure; never leak vendor-specific exception types to routes.
+- They must normalize language codes: accept BCP-47 (`de-DE`) and internally convert to whatever the vendor wants (e.g. Google Translate uses `de`, Deepgram uses `de-DE`).
+- Voice IDs are treated as **opaque strings** by the app. `Voice.id` from one provider is not expected to work with another. When the user switches providers, the voice dropdown repopulates and the stored `tts_voice` is cleared if it's no longer valid.
+- The filesystem audio layer (`audio_store`) is provider-agnostic; it just persists the `audio_bytes` returned by any TTS provider (extension inferred from `mime`).
+
+### 8.2 Provider registry & factory
+
+```python
+# app/providers/__init__.py
+_REGISTRY = {
+    "translator": {
+        "google":   lambda cfg: GoogleTranslator(cfg),
+        "openai":   lambda cfg: OpenAITranslator(cfg),
+        "fake":     lambda cfg: FakeTranslator(cfg),
+    },
+    "tts": {
+        "google":   lambda cfg: GoogleTTS(cfg),
+        "openai":   lambda cfg: OpenAITTS(cfg),
+        "fake":     lambda cfg: FakeTTS(cfg),
+    },
+    "stt": {
+        "google":   lambda cfg: GoogleSTT(cfg),
+        "openai":   lambda cfg: OpenAISTT(cfg),
+        "deepgram": lambda cfg: DeepgramSTT(cfg),
+        "fake":     lambda cfg: FakeSTT(cfg),
+    },
+}
+
+def build_translator(cfg) -> Translator: ...
+def build_tts(cfg) -> TTS: ...
+def build_stt(cfg) -> STT: ...
+```
+
+FastAPI wires these as cached dependencies:
+```python
+@lru_cache
+def get_translator() -> Translator: return build_translator(load_config())
+# used in routes as:  translator: Translator = Depends(get_translator)
+```
+
+Swapping a provider = change env var + restart. Adding a new provider = drop a new file under `app/providers/<vendor>/` and register it; no route changes.
+
+### 8.3 Selecting providers via config
+
+Extend `.env` (see §10.2) with **per-capability** selectors so you can mix vendors (e.g., Google TTS + Deepgram STT + OpenAI Translate):
+
+```dotenv
+# One of: google | openai | fake
+MYGLOT_TRANSLATE_PROVIDER=google
+# One of: google | openai | fake
+MYGLOT_TTS_PROVIDER=google
+# One of: google | openai | deepgram | fake
+MYGLOT_STT_PROVIDER=google
+
+# Vendor credentials (only the ones you use need to be set)
+GOOGLE_APPLICATION_CREDENTIALS=./secrets/gcp.json
+OPENAI_API_KEY=
+DEEPGRAM_API_KEY=
+```
+
+Validation at startup: for each selected provider, verify its required env vars are present; otherwise mark that capability **degraded** and surface a clear error from the relevant endpoints (`503 PROVIDER_NOT_CONFIGURED` with the capability and provider name).
+
+The `GET /api/health/google` endpoint from §10.3 generalizes to **`GET /api/health/providers`** returning per-capability status:
+```json
+{
+  "translator": {"provider":"google","ok":true},
+  "tts":        {"provider":"google","ok":true,"voice_count":42},
+  "stt":        {"provider":"deepgram","ok":false,"error":"DEEPGRAM_API_KEY missing"}
+}
+```
+
+### 8.4 Impact on the data model
+
+- `item.audio_voice` already stores an opaque voice id — no schema change needed, but add `item.audio_provider TEXT` so we know which TTS vendor produced the stored MP3. Regenerate-audio will overwrite both fields.
+
+### 8.5 Testing
+
+- All route tests use the `fake` providers (deterministic, zero network): `FakeTranslator` returns `f"[{target_lang}] {text}"`, `FakeTTS` returns a fixed tiny MP3, `FakeSTT` echoes a preset transcript.
+- Contract tests per provider live in `tests/test_providers_<vendor>.py`, marked with `@pytest.mark.network` and skipped by default; run them manually to verify real credentials.
+
+### Key service contracts (Python) — pure services
+
+```python
+# services/similarity.py
+def score(expected: str, actual: str) -> ScoreResult:  # {score: float, diff: [...]}
+
+# services/audio_store.py
+def save(audio_bytes: bytes, mime: str) -> str:   # returns relative path
+def delete(path: str) -> None: ...
+```
+
+---
+
+## 9. Frontend Layout
+
+```
+frontend/
+  index.html          # shell + tabs: Home | Practice | Settings
+  styles.css
+  js/
+    api.js            # fetch wrappers
+    home.js           # add + list items
+    practice.js       # play/record/score
+    settings.js       # languages + voice
+    recorder.js       # MediaRecorder helper
+    util.js           # debounce, diff render
+```
+
+Served by FastAPI as static files at `/` so everything is one origin (no CORS).
+
+### UI pages
+1. **Home** — input box + "Translate & Save" button; list of items below with inline edit + regenerate + delete.
+2. **Practice** — same list but emphasizes play + record + score; a "hide target" toggle.
+3. **Settings** — source lang, target lang (with BCP-47 examples), voice dropdown (populated via `/api/voices`).
+
+### Mic recording
+- `navigator.mediaDevices.getUserMedia({ audio: true })`.
+- `MediaRecorder` → `audio/webm;codecs=opus` (widely supported).
+- POST as multipart; backend passes to Google STT with `encoding=WEBM_OPUS` and `sample_rate_hertz=48000` (standard for opus/webm).
+
+---
+
+## 10. Configuration & Secrets
+
+There are two distinct layers of configuration, kept intentionally separate:
+
+| Layer | What it holds | Where it lives | How it's changed | When it's read |
+|-------|---------------|----------------|------------------|----------------|
+| **Environment / secrets** | Google credentials, data dir, host/port | `.env` file + process env | Manually edited by the user; requires server restart | At startup |
+| **App settings** | Source lang, target lang, TTS voice | `settings` row in SQLite | Edited in the **Settings** page (UI) or via `PUT /api/settings`; takes effect immediately | On every relevant request |
+
+This split keeps secrets out of the database and the UI, and keeps day-to-day preferences (which you'll change often) out of files you have to edit by hand.
+
+### 10.1 One-time setup (Google Cloud)
+
+> Full step-by-step walkthrough (Console + `gcloud` CLI, with verification and troubleshooting) lives in **[docs/GOOGLE_CLOUD_SETUP.md](docs/GOOGLE_CLOUD_SETUP.md)**. The summary below lists just the outcomes.
+
+The user does this once, outside the app:
+
+1. Create (or reuse) a Google Cloud project at <https://console.cloud.google.com>.
+2. Enable these three APIs in that project:
+   - **Cloud Translation API**
+   - **Cloud Text-to-Speech API**
+   - **Cloud Speech-to-Text API**
+3. Create a **service account** (IAM & Admin → Service Accounts → Create).
+   - Grant roles: `Cloud Translation API User`, `Cloud Speech Client` (covers TTS + STT). For a personal project, the broader `Editor` role also works but is not recommended.
+4. Create a **JSON key** for that service account and download it.
+5. Save the key into the project at `./secrets/gcp.json` (the folder is gitignored).
+6. Make sure **billing** is enabled on the project — all three APIs require it, even within their free tiers.
+
+The app never asks for or stores the key itself; it only reads the path from `GOOGLE_APPLICATION_CREDENTIALS`.
+
+### 10.2 `.env` file (env-layer config)
+
+Copy `.env.example` to `.env` and edit. Supported keys:
+
+```dotenv
+# Required — absolute or project-relative path to the service-account JSON
+GOOGLE_APPLICATION_CREDENTIALS=./secrets/gcp.json
+
+# Optional — where SQLite DB and audio files live (default: ./data)
+MYGLOT_DATA_DIR=./data
+
+# Optional — bind address (default: 127.0.0.1, i.e. localhost-only)
+MYGLOT_HOST=127.0.0.1
+MYGLOT_PORT=8000
+
+# Optional — initial defaults used ONLY on first run to seed the settings row.
+# After first run, change these via the Settings UI instead; edits here are ignored.
+MYGLOT_DEFAULT_SOURCE_LANG=en-US
+MYGLOT_DEFAULT_TARGET_LANG=de-DE
+MYGLOT_DEFAULT_TTS_VOICE=           # empty = let server pick a default for target lang
+
+# Provider selection (see §8.3). Each capability is independent.
+MYGLOT_TRANSLATE_PROVIDER=google    # google | openai | fake
+MYGLOT_TTS_PROVIDER=google          # google | openai | fake
+MYGLOT_STT_PROVIDER=google          # google | openai | deepgram | fake
+
+# Vendor credentials — only set the ones your selected providers need.
+# GOOGLE_APPLICATION_CREDENTIALS is already set above for Google providers.
+OPENAI_API_KEY=
+DEEPGRAM_API_KEY=
+
+# Optional — limits
+MYGLOT_MAX_SOURCE_CHARS=2000
+MYGLOT_MAX_AUDIO_UPLOAD_MB=10
+```
+
+`secrets/`, `data/`, and `.env` are all gitignored. `.env.example` is committed with safe defaults and no secrets.
+
+On startup the backend:
+1. Loads `.env` via `python-dotenv`.
+2. Validates that `GOOGLE_APPLICATION_CREDENTIALS` points to a readable file; if missing, it still starts but marks Google-dependent endpoints as **degraded** (they return `503 GOOGLE_NOT_CONFIGURED` with a clear message in the UI).
+3. Ensures `MYGLOT_DATA_DIR` and `MYGLOT_DATA_DIR/audio/` exist.
+4. Creates `myglot.db` and runs migrations (SQLModel `create_all`) if the file is new.
+5. If the `settings` row does not exist yet, inserts it using the `MYGLOT_DEFAULT_*` values.
+
+### 10.3 App settings (DB-layer config, edited via UI)
+
+The **Settings** page in the UI is the normal way to change these. It reads `GET /api/settings` and writes `PUT /api/settings`.
+
+| Field | Type | UI control | Validation |
+|-------|------|-----------|------------|
+| `source_lang` | BCP-47 string (e.g. `en-US`) | Dropdown of common langs + free-text override | Must match `^[a-z]{2}(-[A-Z]{2})?$` |
+| `target_lang` | BCP-47 string | Same | Same; changing it repopulates the voice dropdown |
+| `tts_voice` | string or empty | Dropdown populated from `GET /api/voices?lang=<target_lang>` | Must be a voice returned by Google for that lang, or empty (= server default) |
+
+Behaviour rules:
+- Changing `target_lang` or `tts_voice` **does not** retroactively regenerate audio for existing items. Each item keeps the `audio_voice` it was created with. If you want items to use the new voice, open them and click **Regenerate audio** — that's the only re-TTS trigger.
+- Changing `source_lang` only affects **new** items; existing items keep their original `source_lang`.
+- Settings changes are saved immediately on the server (no "unsaved changes" state) and are picked up on the very next API call — no restart needed.
+- There is also a **"Test Google connection"** button on the Settings page that calls `GET /api/health/google`, which does a tiny Translate call (`"hello"` → target) and a `ListVoices` call, and reports OK / the specific error. Useful for verifying your `.env` is wired up correctly.
+
+### 10.4 Changing credentials later
+
+If you rotate the service-account key or switch Google projects:
+1. Replace `secrets/gcp.json` (same path) **or** update `GOOGLE_APPLICATION_CREDENTIALS` in `.env` to a new path.
+2. Restart the server (Ctrl-C, re-run `uvicorn`).
+3. Click **Test Google connection** in Settings to confirm.
+
+Existing DB rows and audio files are unaffected.
+
+### 10.5 Resetting the app
+
+- **Wipe settings to defaults:** delete the `settings` row (or the whole `myglot.db`) and restart — it will be reseeded from `.env`.
+- **Wipe everything:** delete `data/` (DB + audio). Next start creates a fresh DB.
+- Secrets in `.env` / `secrets/` are never touched by the app.
+
+---
+
+## 11. Security & Privacy
+- Bind to `127.0.0.1` by default.
+- No auth in v1 (single local user). Document clearly that exposing to the internet requires adding auth.
+- Validate/limit input size (e.g., source text ≤ 2,000 chars; uploaded audio ≤ 10 MB, ≤ 30 s).
+- Sanitize filenames (never derived from user input).
+- CSRF is N/A for local same-origin JSON; still use `SameSite=Lax` session cookie if any are added later.
+
+---
+
+## 12. Testing Strategy
+- **Unit:** similarity scoring, audio path handling, DTO validation.
+- **API:** FastAPI `TestClient` with Google services monkey-patched to return canned text/audio.
+- **Manual smoke:** add item, edit, regenerate, play, record, download — a short checklist in `README.md`.
+
+---
+
+## 13. Deployment (Docker)
+
+The primary way to run MyGlot locally is via **Docker Compose**. It keeps the environment reproducible and avoids polluting the host with Python dependencies. All persistent data lives on the host filesystem via bind-mounted volumes so nothing is lost when containers are rebuilt.
+
+### 13.1 Containers
+
+| Container | Base image | Role | Exposed port |
+|-----------|-----------|------|-------------|
+| `myglot-backend` | `python:3.11-slim` | FastAPI + Uvicorn, serves API **and** the static frontend files | `8000` (mapped to host) |
+
+> A single container is sufficient for v1 — the frontend is plain static files served by FastAPI's `StaticFiles` mount. No separate Nginx or Node container needed. If the frontend grows to need a build step, add a second container then.
+
+### 13.2 Project-level file layout
+
+```
+myglot/
+  backend/
+    Dockerfile
+    app/
+      ...
+  frontend/
+    ...
+  docker-compose.yml
+  .env                  # user-created, gitignored
+  .env.example          # committed
+  secrets/
+    gcp.json            # user-created, gitignored
+  data/                 # created at first run, gitignored
+    myglot.db
+    audio/
+```
+
+### 13.3 `backend/Dockerfile`
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install deps first (layer cache)
+COPY backend/pyproject.toml backend/requirements.txt* ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy backend code
+COPY backend/app ./app
+
+# Copy frontend into a path the backend will serve as static files
+COPY frontend /app/frontend
+
+# Data dir will be bind-mounted at runtime; create the mount point
+RUN mkdir -p /app/data /app/secrets
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+Notes:
+- `--host 0.0.0.0` inside the container so Docker port mapping works. The *host-side* mapping in `docker-compose.yml` binds to `127.0.0.1` for security.
+- No `GOOGLE_APPLICATION_CREDENTIALS` baked in — it's passed via environment at runtime.
+
+### 13.4 `docker-compose.yml`
+
+```yaml
+version: "3.9"
+
+services:
+  myglot:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: myglot
+    ports:
+      - "127.0.0.1:8000:8000"          # only on localhost
+    env_file:
+      - .env
+    environment:
+      # Override paths to match container mount points
+      GOOGLE_APPLICATION_CREDENTIALS: /app/secrets/gcp.json
+      MYGLOT_DATA_DIR: /app/data
+      MYGLOT_HOST: "0.0.0.0"
+      MYGLOT_PORT: "8000"
+    volumes:
+      # Persistent data — DB + audio files survive container rebuilds
+      - ./data:/app/data
+      # Google credentials (read-only inside container)
+      - ./secrets:/app/secrets:ro
+    restart: unless-stopped
+```
+
+### 13.5 Volume mounts explained
+
+| Host path | Container path | Purpose | Mode |
+|-----------|---------------|---------|------|
+| `./data` | `/app/data` | SQLite DB (`myglot.db`) + `audio/` folder | read-write |
+| `./secrets` | `/app/secrets` | `gcp.json` service-account key | **read-only** |
+
+Because these are **bind mounts** (not named Docker volumes), the files live directly in your project directory. You can:
+- Browse `data/audio/*.mp3` from Finder / your file manager.
+- Back up `data/` with normal file tools.
+- Inspect / edit `data/myglot.db` with `sqlite3` or any DB browser.
+- Delete `data/` to wipe everything and start fresh.
+
+The `.env` file is read by Docker Compose via `env_file` and passed as environment variables to the container. It is **not** bind-mounted as a file.
+
+### 13.6 Running
+
+```bash
+# First time — build and start
+docker compose up --build
+
+# Subsequent starts (no rebuild needed unless code changed)
+docker compose up
+
+# Run in background
+docker compose up -d
+
+# View logs
+docker compose logs -f myglot
+
+# Stop
+docker compose down
+
+# Rebuild after code changes
+docker compose up --build
+
+# Full reset (wipe data)
+docker compose down
+rm -rf data/
+docker compose up --build
+```
+
+Open <http://localhost:8000> in your browser.
+
+### 13.7 Development mode (without Docker)
+
+For faster iteration you can still run without Docker:
+
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+The `.env` at the project root is loaded by `python-dotenv`. Paths like `./secrets/gcp.json` and `./data` resolve relative to where you run `uvicorn` from (the project root), so run from there or use absolute paths.
+
+### 13.8 `.dockerignore`
+
+```
+data/
+secrets/
+.env
+__pycache__/
+*.pyc
+.git/
+.venv/
+```
+
+Keeps secrets, data, and caches out of the build context (faster builds, no credential leaks into image layers).
+
+---
+
+## 14. Delivery Plan (milestones)
+
+1. **M0 — Scaffolding:** repo layout, `Dockerfile`, `docker-compose.yml`, FastAPI hello, SQLite init, static frontend shell, `.env.example`, `.dockerignore`, `.gitignore`, README with setup.
+2. **M1 — Add & list items:** Translate + TTS + DB + list UI + play audio + categories CRUD.
+3. **M2 — Edit & regenerate:** PATCH target text, regenerate-audio endpoint, stale flag in UI.
+4. **M3 — Practice & STT:** mic recording, STT, similarity scoring, diff UI.
+5. **M4 — Polish:** voices dropdown, search, delete, download button, tests, README.
+
+---
+
+## 15. Resolved Decisions
+
+| # | Question | Decision |
+|---|----------|----------|
+| 1 | Languages to start with | Source: `en-US`, Target: `de-DE` |
+| 2 | Hide target text in practice? | Yes — hidden by default, revealed on button press |
+| 3 | Keep `attempt` history table? | No — score is shown ephemerally after each STT attempt, not persisted |
+| 4 | Preferred voice type | Neural2 if available → WaveNet → Standard (cascading fallback) |
+| 5 | Frontend framework | Vanilla JS (no framework) |
+
+---
+
+## 16. Implementation Notes (low-level decisions made during coding)
+
+These details supplement the spec and were decided during implementation.
+
+### 16.1 Provider abstraction — ABC vs Protocol
+Used `abc.ABC` with `@abstractmethod` (not `typing.Protocol`) for `Translator`, `TTS`, and `STT`. This gives clearer error messages when a subclass forgets to implement a method. The concrete classes are:
+- `providers/google/{translate,tts,stt}.py`
+- `providers/fake/{translate,tts,stt}.py` (for tests / offline dev)
+- `providers/registry.py` — factory functions `get_translator()`, `get_tts()`, `get_stt()` cached with `@lru_cache`.
+
+### 16.2 Google client singletons
+Each Google provider module uses a module-level `_client = None` with a `_get_client()` lazy initializer. This avoids re-creating the gRPC client on every request. The `@lru_cache` on the registry factory ensures one provider instance per process.
+
+### 16.3 Frontend static file serving
+FastAPI `StaticFiles(directory=..., html=True)` is mounted at `/` **after** all `/api` routes. The frontend path is resolved at startup with a priority list:
+1. `../../frontend` relative to `app/main.py` (local dev)
+2. `/app/frontend` (Docker)
+
+### 16.4 Item creation inline category
+`POST /api/items` accepts an optional `category_name` field (in addition to `category_id`). If provided and no category with that name exists, it's created on the fly. This avoids a separate round-trip in the UI.
+
+### 16.5 Edit modal
+The Home tab uses a modal dialog for editing items (target text + category). This avoids inline-editing complexity and keeps the list view clean.
+
+### 16.6 Practice — reveal toggle
+In the Practice tab, each item's target text has `filter: blur(5px)` by default. The "Reveal" button toggles the blur on/off per-item and changes its label to "Hide".
+
+### 16.7 Recording flow
+The Record button is a toggle: click once to start recording, click again to stop. While recording, the button pulses (CSS animation) and shows "⏹ Stop". On stop, the blob is immediately sent to `POST /api/items/{id}/practice`.
+
+### 16.8 `docker-compose.yml` — no `version` key
+Modern Docker Compose (v2+) no longer requires the `version` field. Omitted for simplicity.
+
+### 16.9 Category deletion — manual SET NULL
+SQLite `ON DELETE SET NULL` may not fire through SQLModel's cascade config, so `DELETE /api/categories/{id}` manually nullifies `item.category_id` before deleting the category row.
+
+### 16.10 Settings seeding
+`Settings` row (id=1) is seeded both in `main.py` startup and lazily in `routes/settings.py._ensure_settings()`. The double-check ensures it exists regardless of startup order or test setup.
+
+### 16.11 File layout (actual)
+```
+myglot/
+  SPEC.md
+  README.md
+  .env.example
+  .gitignore
+  .dockerignore
+  docker-compose.yml
+  docs/
+    GOOGLE_CLOUD_SETUP.md
+  backend/
+    Dockerfile
+    requirements.txt
+    pyproject.toml
+    app/
+      __init__.py
+      main.py
+      config.py
+      db.py
+      models.py
+      schemas.py
+      errors.py
+      routes/
+        __init__.py
+        health.py
+        settings.py
+        voices.py
+        categories.py
+        items.py
+      providers/
+        __init__.py
+        base.py
+        registry.py
+        google/
+          __init__.py
+          translate.py
+          tts.py
+          stt.py
+        fake/
+          __init__.py
+          translate.py
+          tts.py
+          stt.py
+      services/
+        __init__.py
+        audio_store.py
+        similarity.py
+  frontend/
+    index.html
+    styles.css
+    js/
+      api.js
+      util.js
+      recorder.js
+      home.js
+      practice.js
+      settings.js
+      app.js
+```
+
+---
+
+*End of spec.*
