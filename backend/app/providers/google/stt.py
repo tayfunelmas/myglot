@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..base import STT, STTResult, ProviderError
+from ..base import STT, ProviderError, STTResult
 
 _client = None
 
@@ -9,6 +9,7 @@ def _get_client():
     global _client
     if _client is None:
         from google.cloud import speech
+
         _client = speech.SpeechClient()
     return _client
 
@@ -34,13 +35,17 @@ class GoogleSTT(STT):
 
             client = _get_client()
 
-            encoding_name = _ENCODING_MAP.get(mime.lower().split(";")[0], None)
+            encoding_name = _ENCODING_MAP.get(mime.lower().split(";")[0])
             if mime.lower() in _ENCODING_MAP:
                 encoding_name = _ENCODING_MAP[mime.lower()]
             elif mime.lower().split(";")[0] in _ENCODING_MAP:
                 encoding_name = _ENCODING_MAP[mime.lower().split(";")[0]]
 
-            encoding = getattr(speech.RecognitionConfig.AudioEncoding, encoding_name) if encoding_name else speech.RecognitionConfig.AudioEncoding.ENCODING_UNSPECIFIED
+            encoding = (
+                getattr(speech.RecognitionConfig.AudioEncoding, encoding_name)
+                if encoding_name
+                else speech.RecognitionConfig.AudioEncoding.ENCODING_UNSPECIFIED
+            )
 
             config = speech.RecognitionConfig(
                 encoding=encoding,

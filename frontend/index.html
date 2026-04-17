@@ -10,9 +10,9 @@
     <header>
         <h1>MyGlot</h1>
         <nav>
-            <button class="tab active" data-tab="home">Home</button>
-            <button class="tab" data-tab="practice">Practice</button>
-            <button class="tab" data-tab="settings">Settings</button>
+            <button type="button" class="tab active" data-tab="home">Home</button>
+            <button type="button" class="tab" data-tab="practice">Practice</button>
+            <button type="button" class="tab" data-tab="settings">Settings</button>
         </nav>
     </header>
 
@@ -30,7 +30,7 @@
                     </select>
                     <input id="new-category" type="text" placeholder="Or type new category name...">
                 </div>
-                <button id="btn-translate" class="primary">Translate &amp; Generate Audio</button>
+                <button type="button" id="btn-translate" class="primary">Translate &amp; Generate Audio</button>
                 <div id="add-status" class="status"></div>
             </div>
 
@@ -72,13 +72,13 @@
                         <option value="">Default (auto-select)</option>
                     </select>
                 </label>
-                <button id="btn-load-voices">Load Voices for Target Language</button>
-                <button id="btn-save-settings" class="primary">Save Settings</button>
+                <button type="button" id="btn-load-voices">Load Voices for Target Language</button>
+                <button type="button" id="btn-save-settings" class="primary">Save Settings</button>
                 <div id="settings-status" class="status"></div>
 
                 <hr>
                 <h3>Provider Status</h3>
-                <button id="btn-test-providers">Test Providers</button>
+                <button type="button" id="btn-test-providers">Test Providers</button>
                 <div id="provider-status" class="provider-status"></div>
             </div>
 
@@ -87,7 +87,7 @@
             <div class="category-manager">
                 <div class="form-row">
                     <input id="new-cat-name" type="text" placeholder="New category name...">
-                    <button id="btn-add-cat">Add Category</button>
+                    <button type="button" id="btn-add-cat">Add Category</button>
                 </div>
                 <div id="categories-list" class="categories-list"></div>
             </div>
@@ -108,8 +108,8 @@
                 </select>
             </label>
             <div class="modal-actions">
-                <button id="btn-edit-save" class="primary">Save</button>
-                <button id="btn-edit-cancel">Cancel</button>
+                <button type="button" id="btn-edit-save" class="primary">Save</button>
+                <button type="button" id="btn-edit-cancel">Cancel</button>
             </div>
             <div id="edit-status" class="status"></div>
         </div>

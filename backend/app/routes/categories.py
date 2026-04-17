@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends
-from sqlmodel import Session, select, func
+from sqlmodel import Session, func, select
 
 from ..db import get_session
-from ..models import Category, Item
-from ..schemas import CategoryCreate, CategoryUpdate, CategoryOut
 from ..errors import NotFoundError, ValidationError
+from ..models import Category, Item
+from ..schemas import CategoryCreate, CategoryOut, CategoryUpdate
 
 router = APIRouter(tags=["categories"])
 
@@ -13,14 +13,14 @@ router = APIRouter(tags=["categories"])
 def list_categories(session: Session = Depends(get_session)):
     # Get categories with item counts
     stmt = (
-        select(Category, func.count(Item.id).label("item_count"))
-        .outerjoin(Item, Item.category_id == Category.id)
-        .group_by(Category.id)
+        select(Category, func.count(Item.id).label("item_count"))  # type: ignore[arg-type]
+        .outerjoin(Item, Item.category_id == Category.id)  # type: ignore[arg-type]
+        .group_by(Category.id)  # type: ignore[arg-type]
         .order_by(Category.name)
     )
     results = session.exec(stmt).all()
     return [
-        CategoryOut(id=cat.id, name=cat.name, item_count=count, created_at=cat.created_at)
+        CategoryOut(id=cat.id, name=cat.name, item_count=count, created_at=cat.created_at)  # type: ignore[arg-type]
         for cat, count in results
     ]
 
@@ -39,11 +39,13 @@ def create_category(data: CategoryCreate, session: Session = Depends(get_session
     session.add(cat)
     session.commit()
     session.refresh(cat)
-    return CategoryOut(id=cat.id, name=cat.name, item_count=0, created_at=cat.created_at)
+    return CategoryOut(id=cat.id, name=cat.name, item_count=0, created_at=cat.created_at)  # type: ignore[arg-type]
 
 
 @router.patch("/categories/{category_id}", response_model=CategoryOut)
-def update_category(category_id: int, data: CategoryUpdate, session: Session = Depends(get_session)):
+def update_category(
+    category_id: int, data: CategoryUpdate, session: Session = Depends(get_session)
+):
     cat = session.get(Category, category_id)
     if not cat:
         raise NotFoundError("Category", category_id)
@@ -52,7 +54,9 @@ def update_category(category_id: int, data: CategoryUpdate, session: Session = D
     if not name:
         raise ValidationError("Category name cannot be empty")
 
-    existing = session.exec(select(Category).where(Category.name == name, Category.id != category_id)).first()
+    existing = session.exec(
+        select(Category).where(Category.name == name, Category.id != category_id)
+    ).first()
     if existing:
         raise ValidationError(f"Category '{name}' already exists")
 
@@ -61,8 +65,8 @@ def update_category(category_id: int, data: CategoryUpdate, session: Session = D
     session.commit()
     session.refresh(cat)
 
-    count = session.exec(select(func.count(Item.id)).where(Item.category_id == category_id)).one()
-    return CategoryOut(id=cat.id, name=cat.name, item_count=count, created_at=cat.created_at)
+    count = session.exec(select(func.count(Item.id)).where(Item.category_id == category_id)).one()  # type: ignore[arg-type]
+    return CategoryOut(id=cat.id, name=cat.name, item_count=count, created_at=cat.created_at)  # type: ignore[arg-type]
 
 
 @router.delete("/categories/{category_id}", status_code=204)

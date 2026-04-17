@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
+from ..config import get_config
 from ..db import get_session
 from ..models import Settings
 from ..schemas import SettingsOut, SettingsUpdate
-from ..config import get_config
 
 router = APIRouter(tags=["settings"])
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..base import TTS, TTSResult, Voice, ProviderError
+from ..base import TTS, ProviderError, TTSResult, Voice
 
 _client = None
 
@@ -9,6 +9,7 @@ def _get_client():
     global _client
     if _client is None:
         from google.cloud import texttospeech
+
         _client = texttospeech.TextToSpeechClient()
     return _client
 
@@ -33,6 +34,7 @@ class GoogleTTS(TTS):
     def synthesize(self, text: str, lang: str, voice_id: str | None = None) -> TTSResult:
         try:
             from google.cloud import texttospeech
+
             client = _get_client()
 
             if not voice_id:
@@ -64,6 +66,7 @@ class GoogleTTS(TTS):
     def list_voices(self, lang: str) -> list[Voice]:
         try:
             from google.cloud import texttospeech
+
             client = _get_client()
             response = client.list_voices(language_code=lang)
             results = []
@@ -73,13 +76,15 @@ class GoogleTTS(TTS):
                     texttospeech.SsmlVoiceGender.FEMALE: "female",
                     texttospeech.SsmlVoiceGender.NEUTRAL: "neutral",
                 }
-                results.append(Voice(
-                    id=v.name,
-                    display_name=v.name,
-                    gender=gender_map.get(v.ssml_gender, "unknown"),
-                    lang=lang,
-                    provider="google",
-                ))
+                results.append(
+                    Voice(
+                        id=v.name,
+                        display_name=v.name,
+                        gender=gender_map.get(v.ssml_gender, "unknown"),  # type: ignore[arg-type]
+                        lang=lang,
+                        provider="google",
+                    )
+                )
             return results
         except Exception as e:
             raise ProviderError(f"Google TTS list_voices error: {e}") from e

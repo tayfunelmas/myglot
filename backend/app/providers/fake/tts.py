@@ -22,6 +22,18 @@ class FakeTTS(TTS):
 
     def list_voices(self, lang: str) -> list[Voice]:
         return [
-            Voice(id=f"{lang}-Fake-A", display_name="Fake Voice A", gender="female", lang=lang, provider="fake"),
-            Voice(id=f"{lang}-Fake-B", display_name="Fake Voice B", gender="male", lang=lang, provider="fake"),
+            Voice(
+                id=f"{lang}-Fake-A",
+                display_name="Fake Voice A",
+                gender="female",
+                lang=lang,
+                provider="fake",
+            ),
+            Voice(
+                id=f"{lang}-Fake-B",
+                display_name="Fake Voice B",
+                gender="male",
+                lang=lang,
+                provider="fake",
+            ),
         ]

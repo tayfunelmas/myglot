@@ -1,0 +1,122 @@
+version: "3"
+
+vars:
+  BACKEND_DIR: backend
+  FRONTEND_DIR: frontend
+  BACKEND_SRC: "{{.BACKEND_DIR}}/app"
+
+tasks:
+  # ---------- Setup ----------
+  setup:
+    desc: Install all dev dependencies
+    cmds:
+      - pip install -e "{{.BACKEND_DIR}}[dev,lint]"
+      - npm install --prefix {{.FRONTEND_DIR}}
+
+  # ---------- Linting & Formatting ----------
+  lint:
+    desc: Run all lint and type checks (backend + frontend)
+    cmds:
+      - task: lint:backend
+      - task: lint:frontend
+
+  lint:backend:
+    desc: Lint and type-check backend Python code
+    cmds:
+      - task: lint:backend:ruff
+      - task: lint:backend:mypy
+
+  lint:backend:ruff:
+    desc: Run ruff linter on backend
+    cmds:
+      - ruff check {{.BACKEND_SRC}}
+
+  lint:backend:mypy:
+    desc: Run mypy type checker on backend
+    cmds:
+      - mypy {{.BACKEND_SRC}}
+
+  lint:frontend:
+    desc: Lint frontend JS code with Biome
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - npx @biomejs/biome check .
+
+  format:
+    desc: Format all code (backend + frontend)
+    cmds:
+      - task: format:backend
+      - task: format:frontend
+
+  format:backend:
+    desc: Format backend Python code (ruff)
+    cmds:
+      - ruff format {{.BACKEND_SRC}}
+      - ruff check --fix --select I {{.BACKEND_SRC}}
+
+  format:frontend:
+    desc: Format frontend JS/HTML/CSS with Biome
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - npx @biomejs/biome format --write .
+
+  check:
+    desc: Run format check + lint (CI-friendly, no writes)
+    cmds:
+      - ruff format --check {{.BACKEND_SRC}}
+      - ruff check {{.BACKEND_SRC}}
+      - mypy {{.BACKEND_SRC}}
+      - task: lint:frontend
+
+  # ---------- Docker ----------
+  build:
+    desc: Build Docker image
+    cmds:
+      - docker compose build
+
+  up:
+    desc: Start application via docker compose (detached)
+    cmds:
+      - docker compose up -d
+
+  down:
+    desc: Stop application
+    cmds:
+      - docker compose down
+
+  logs:
+    desc: Tail application logs
+    cmds:
+      - docker compose logs -f
+
+  restart:
+    desc: Rebuild and restart
+    cmds:
+      - docker compose up -d --build
+
+  # ---------- Local dev ----------
+  dev:
+    desc: Run backend locally for development (auto-reload)
+    dir: "{{.BACKEND_DIR}}"
+    dotenv:
+      - ../.env
+    cmds:
+      - uvicorn app.main:app --reload --host ${MYGLOT_HOST:-127.0.0.1} --port ${MYGLOT_PORT:-8000}
+
+  dev:setup:
+    desc: Create venv, install deps, and init .env
+    cmds:
+      - python3 -m venv .venv
+      - .venv/bin/pip install -e "{{.BACKEND_DIR}}[dev,lint]"
+      - npm install --prefix {{.FRONTEND_DIR}}
+      - cmd: cp -n .env.example .env
+        ignore_error: true
+      - mkdir -p data/audio secrets
+      - echo "Done. Activate with 'source .venv/bin/activate'"
+
+  # ---------- Test ----------
+  test:
+    desc: Run backend tests
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - pytest -v

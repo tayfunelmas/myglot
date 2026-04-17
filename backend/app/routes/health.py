@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 
 from ..config import get_config
-from ..providers.registry import get_translator, get_tts, get_stt
 from ..providers.base import ProviderError
+from ..providers.registry import get_stt, get_translator, get_tts
 from ..schemas import HealthProviders, ProviderStatus
 
 router = APIRouter(tags=["health"])

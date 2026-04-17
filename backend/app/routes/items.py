@@ -1,22 +1,30 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, UploadFile, File, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import FileResponse
-from sqlmodel import Session, select, func, col
+from sqlmodel import Session, col, func, select
 
-from ..db import get_session
-from ..models import Item, Category, Settings
-from ..schemas import (
-    ItemCreate, ItemUpdate, ItemOut, ItemListOut, CategoryRef, PracticeResult,
-)
-from ..errors import (
-    NotFoundError, ValidationError, ProviderAPIError, AudioMissingError,
-)
 from ..config import get_config
-from ..providers.registry import get_translator, get_tts, get_stt
+from ..db import get_session
+from ..errors import (
+    AudioMissingError,
+    NotFoundError,
+    ProviderAPIError,
+    ValidationError,
+)
+from ..models import Category, Item, Settings
 from ..providers.base import ProviderError
+from ..providers.registry import get_stt, get_translator, get_tts
+from ..schemas import (
+    CategoryRef,
+    ItemCreate,
+    ItemListOut,
+    ItemOut,
+    ItemUpdate,
+    PracticeResult,
+)
 from ..services import audio_store, similarity
 
 router = APIRouter(tags=["items"])
@@ -25,9 +33,9 @@ router = APIRouter(tags=["items"])
 def _item_to_out(item: Item) -> ItemOut:
     cat_ref = None
     if item.category:
-        cat_ref = CategoryRef(id=item.category.id, name=item.category.name)
+        cat_ref = CategoryRef(id=item.category.id, name=item.category.name)  # type: ignore[arg-type]
     return ItemOut(
-        id=item.id,
+        id=item.id,  # type: ignore[arg-type]
         source_lang=item.source_lang,
         target_lang=item.target_lang,
         source_text=item.source_text,
@@ -44,6 +52,7 @@ def _item_to_out(item: Item) -> ItemOut:
 
 def _get_settings(session: Session) -> Settings:
     from ..routes.settings import _ensure_settings
+
     return _ensure_settings(session)
 
 
@@ -56,7 +65,7 @@ def list_items(
     session: Session = Depends(get_session),
 ):
     stmt = select(Item)
-    count_stmt = select(func.count(Item.id))
+    count_stmt = select(func.count(Item.id))  # type: ignore[arg-type]
 
     if category_id is not None:
         stmt = stmt.where(Item.category_id == category_id)
@@ -72,7 +81,9 @@ def list_items(
         )
 
     total = session.exec(count_stmt).one()
-    items = session.exec(stmt.order_by(col(Item.created_at).desc()).offset(offset).limit(limit)).all()
+    items = session.exec(
+        stmt.order_by(col(Item.created_at).desc()).offset(offset).limit(limit)
+    ).all()
 
     return ItemListOut(items=[_item_to_out(item) for item in items], total=total)
 
@@ -109,7 +120,7 @@ def create_item(data: ItemCreate, session: Session = Depends(get_session)):
         translator = get_translator()
         target_text = translator.translate(source_text, settings.source_lang, settings.target_lang)
     except ProviderError as e:
-        raise ProviderAPIError("translator", str(e))
+        raise ProviderAPIError("translator", str(e)) from e
 
     # TTS
     audio_path = None
@@ -174,7 +185,7 @@ def update_item(item_id: int, data: ItemUpdate, session: Session = Depends(get_s
                 raise NotFoundError("Category", data.category_id)
             item.category_id = data.category_id
 
-    item.updated_at = datetime.now(timezone.utc)
+    item.updated_at = datetime.now(UTC)
     session.add(item)
     session.commit()
     session.refresh(item)
@@ -201,9 +212,9 @@ def regenerate_audio(item_id: int, session: Session = Depends(get_session)):
         item.audio_provider = tts.name
         item.audio_stale = False
     except ProviderError as e:
-        raise ProviderAPIError("tts", str(e))
+        raise ProviderAPIError("tts", str(e)) from e
 
-    item.updated_at = datetime.now(timezone.utc)
+    item.updated_at = datetime.now(UTC)
     session.add(item)
     session.commit()
     session.refresh(item)
@@ -244,7 +255,9 @@ def get_audio(item_id: int, download: int = 0, session: Session = Depends(get_se
 
 
 @router.post("/items/{item_id}/practice", response_model=PracticeResult)
-async def practice(item_id: int, audio: UploadFile = File(...), session: Session = Depends(get_session)):
+async def practice(
+    item_id: int, audio: UploadFile = File(...), session: Session = Depends(get_session)
+):
     item = session.get(Item, item_id)
     if not item:
         raise NotFoundError("Item", item_id)
@@ -252,7 +265,9 @@ async def practice(item_id: int, audio: UploadFile = File(...), session: Session
     cfg = get_config()
     audio_bytes = await audio.read()
     if len(audio_bytes) > cfg.max_audio_upload_bytes:
-        raise ValidationError(f"Audio file too large (max {cfg.max_audio_upload_bytes // (1024*1024)} MB)")
+        raise ValidationError(
+            f"Audio file too large (max {cfg.max_audio_upload_bytes // (1024 * 1024)} MB)"
+        )
 
     mime = audio.content_type or "audio/webm"
 
@@ -260,7 +275,7 @@ async def practice(item_id: int, audio: UploadFile = File(...), session: Session
         stt = get_stt()
         stt_result = stt.transcribe(audio_bytes, mime, item.target_lang)
     except ProviderError as e:
-        raise ProviderAPIError("stt", str(e))
+        raise ProviderAPIError("stt", str(e)) from e
 
     score_result = similarity.score(item.target_text, stt_result.transcript)
 

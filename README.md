@@ -16,7 +16,8 @@ mkdir -p secrets
 # Copy your key to secrets/gcp.json (see docs/GOOGLE_CLOUD_SETUP.md)
 
 # 3. Build and run
-docker compose up --build
+task build
+task up
 
 # 4. Open http://localhost:8000
 ```
@@ -24,13 +25,34 @@ docker compose up --build
 ## Development (without Docker)
 
 ```bash
-cd backend
-python -m venv .venv
+# One-time setup: creates venv, installs deps, copies .env
+task dev:setup
 source .venv/bin/activate
-pip install -r requirements.txt
-cd ..
-uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
+
+# Run with auto-reload
+task dev
 ```
+
+## Tasks
+
+This project uses [Task](https://taskfile.dev/) as a task runner. Run `task --list` to see all available tasks.
+
+| Task | Description |
+|---|---|
+| `task dev:setup` | Create venv, install all deps, and init `.env` |
+| `task setup` | Install dev + lint dependencies (no venv) |
+| `task dev` | Run backend locally with auto-reload |
+| `task build` | Build Docker image |
+| `task up` | Start application via docker compose (detached) |
+| `task down` | Stop application |
+| `task restart` | Rebuild and restart |
+| `task logs` | Tail application logs |
+| `task lint` | Run all lint and type checks (backend + frontend) |
+| `task lint:backend` | Ruff linter + mypy type checker |
+| `task lint:frontend` | Biome linter for JS/HTML/CSS |
+| `task format` | Auto-format all code (ruff + Biome) |
+| `task check` | CI-friendly: format check + lint (no writes) |
+| `task test` | Run backend tests with pytest |
 
 ## Project Structure
 

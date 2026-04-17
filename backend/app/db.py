@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from sqlmodel import SQLModel, create_engine, Session
+from sqlmodel import Session, SQLModel, create_engine
+
 from .config import get_config
 
 _engine = None
@@ -21,6 +22,7 @@ def get_engine():
 
 def init_db() -> None:
     from . import models  # noqa: F401 — ensure models registered
+
     SQLModel.metadata.create_all(get_engine())
 
 

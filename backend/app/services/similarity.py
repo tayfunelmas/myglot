@@ -3,6 +3,7 @@ from __future__ import annotations
 import difflib
 import re
 import unicodedata
+
 from pydantic import BaseModel
 
 
@@ -27,11 +28,11 @@ def _word_f1(expected_words: list[str], actual_words: list[str]) -> float:
     if not expected_words or not actual_words:
         return 0.0
 
-    expected_set = {}
+    expected_set: dict[str, int] = {}
     for w in expected_words:
         expected_set[w] = expected_set.get(w, 0) + 1
 
-    actual_set = {}
+    actual_set: dict[str, int] = {}
     for w in actual_words:
         actual_set[w] = actual_set.get(w, 0) + 1
 
