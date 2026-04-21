@@ -62,10 +62,16 @@ A personal, single-user web app for learning a target language by accumulating a
 2. Saves → DB row updated, `audio_stale = true`.
 3. User clicks **Regenerate audio** → backend re-runs TTS, replaces the MP3 file, sets `audio_stale = false`.
 
-### 2.4 Practice
+### 2.4 Reorder items
+1. On the Home tab, items are displayed in a **table** with drag handles on the left.
+2. User drags an item's handle (☰) to reorder it above or below other items.
+3. The new order is persisted immediately via `POST /api/items/reorder`.
+4. On next visit, items appear in the saved order.
+
+### 2.5 Practice
 1. User opens **Practice**.
-2. Optionally selects a **category** filter (dropdown at the top). Selecting "All" shows everything; selecting a specific category shows only its items.
-3. Sees a list (or one-at-a-time card view, toggle) of the filtered items:
+2. Optionally selects one or more **categories** to filter (multi-select; selecting none shows all). The selection is **sticky** — persisted in `localStorage` and restored on next visit.
+3. Sees a **table** of the filtered items:
    - Source text.
    - Target text (**hidden by default**; press a **Reveal** button to show it).
    - **▶ Play** button (plays stored MP3).
@@ -74,13 +80,18 @@ A personal, single-user web app for learning a target language by accumulating a
    - UI shows: your transcript, the expected target text, a score (0–100), and a diff highlighting mismatched words. The score is displayed until the user navigates away; it is not saved.
 3. User can **Download audio** (MP3) per item.
 
-### 2.5 Manage categories
+### 2.6 Backup & Restore
+1. User opens **Settings** and scrolls to **Database Backup & Restore**.
+2. **Download Backup** — downloads a consistent `.db` snapshot of the entire database via `GET /api/backup`.
+3. **Restore from Backup** — user selects a `.db` file and clicks **Restore from Backup**. The server validates the file, creates a safety copy of the current DB, then swaps it in. The page reloads automatically.
+
+### 2.7 Manage categories
 - User can create, rename, and delete categories from the **Home** page or a dedicated section.
 - Deleting a category does **not** delete its items — they become uncategorized (`category_id = NULL`).
 - Items can be moved between categories (change category via edit).
 
-### 2.6 Manage items
-- Search / filter by source or target text, **and/or by category**.
+### 2.8 Manage items
+- Search / filter by source or target text, **and/or by multiple categories** (multi-select filter, sticky across sessions via `localStorage`).
 - Delete an item (removes DB row + audio file).
 - Change an item's category.
 
@@ -98,8 +109,12 @@ A personal, single-user web app for learning a target language by accumulating a
 | F5 | Similarity scoring: server computes normalized similarity between transcript and stored target text (see §6.4). |
 | F6 | Settings: persist source lang, target lang, voice. |
 | F7 | Audio download endpoint serving the stored MP3 with correct `Content-Type` and `Content-Disposition`. |
-| F8 | Regenerate audio endpoint for an item. |
+| F8 | Regenerate audio endpoint for an item (always available, not only when stale). |
 | F9 | List voices endpoint (proxies Google TTS `ListVoices`, filtered by target lang). |
+| F10 | Reorder items: `POST /api/items/reorder` accepts an ordered list of item IDs and persists the sort order. |
+| F11 | Multi-category filter: `GET /api/items` accepts `category_ids` (comma-separated) for filtering by multiple categories. |
+| F12 | Database backup: `GET /api/backup` downloads a consistent SQLite snapshot. |
+| F13 | Database restore: `POST /api/restore` accepts a `.db` file upload, validates it, and replaces the current database. |
 
 ## 4. Non-Functional Requirements
 - **Simplicity:** minimal dependencies; easy to run with one command.
@@ -259,7 +274,10 @@ Base path: `/api`. All JSON unless noted.
 | POST   | `/api/categories`            | `{name}`                                                    | `Category` |
 | PATCH  | `/api/categories/{id}`       | `{name}`                                                    | `Category` |
 | DELETE | `/api/categories/{id}`       | —                                                           | `204` (items become uncategorized) |
-| GET    | `/api/items?q=&category_id=&limit=&offset=` | —                                                | `{items:[Item], total}` |
+| GET    | `/api/items?q=&category_id=&category_ids=&limit=&offset=` | `category_ids`: comma-separated IDs for multi-filter | `{items:[Item], total}` |
+| POST   | `/api/items/reorder`         | `{item_ids:[int]}`                                          | `{status:"ok"}` |
+| GET    | `/api/backup`                | —                                                           | `application/x-sqlite3` (attachment) |
+| POST   | `/api/restore`               | multipart: `file` (.db)                                     | `{status:"ok", message:"..."}` |
 | POST   | `/api/items`                 | `{source_text, category_id?}` (uses current settings for langs/voice) | `Item` (with `target_text`, `audio_url`) |
 | GET    | `/api/items/{id}`            | —                                                           | `Item` |
 | PATCH  | `/api/items/{id}`            | `{target_text?, category_id?}`                              | `Item` (sets `audio_stale=true` if `target_text` changed) |
@@ -857,7 +875,20 @@ SQLite `ON DELETE SET NULL` may not fire through SQLModel's cascade config, so `
 ### 16.10 Settings seeding
 `Settings` row (id=1) is seeded both in `main.py` startup and lazily in `routes/settings.py._ensure_settings()`. The double-check ensures it exists regardless of startup order or test setup.
 
-### 16.11 File layout (actual)
+### 16.11 Table layout for Home & Practice
+Both the Home and Practice tabs use an HTML `<table>` layout with columns: source text, target translation, category, and action buttons. The Home tab also has a drag-handle column for reordering. This replaced the earlier card-based layout for a cleaner, more compact view.
+
+### 16.12 Multi-category filter with sticky selection
+Category filters on Home and Practice are `<select multiple>` elements. Selections are persisted to `localStorage` (keys `myglot_home-category-filter` and `myglot_practice-category-filter`) and restored on page load. The backend accepts `category_ids` as comma-separated integers.
+
+### 16.13 Regenerate audio always visible
+The regenerate audio button (↻) is always shown in the Home table, not only when `audio_stale` is true. This allows re-generating audio after changing the TTS voice in Settings.
+
+### 16.14 Database backup & restore
+- **Backup** (`GET /api/backup`): uses SQLite's Online Backup API to create a consistent, lock-free copy of the database, served as a timestamped `.db` file download.
+- **Restore** (`POST /api/restore`): accepts a `.db` file upload, validates it contains the expected tables (`item`, `settings`), creates a safety copy of the current DB (`myglot_pre_restore_<timestamp>.db` in `data/`), then swaps the file and reinitializes the engine. The page reloads after restore.
+
+### 16.15 File layout (actual)
 ```
 myglot/
   SPEC.md
@@ -866,6 +897,8 @@ myglot/
   .gitignore
   .dockerignore
   docker-compose.yml
+  .github/
+    copilot-instructions.md
   docs/
     GOOGLE_CLOUD_SETUP.md
   backend/
@@ -877,9 +910,13 @@ myglot/
       main.py
       config.py
       db.py
+      migrate.py
       models.py
       schemas.py
       errors.py
+      migrations/
+        __init__.py
+        001_add_sort_order.py
       routes/
         __init__.py
         health.py

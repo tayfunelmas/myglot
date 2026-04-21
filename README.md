@@ -68,3 +68,8 @@ data/             SQLite DB + audio files (gitignored)
 secrets/          Google credentials (gitignored)
 docs/             Setup guides
 ```
+
+## Backup & Restore
+
+- **Backup:** Go to Settings → Database Backup & Restore → **Download Backup**. This downloads a `.db` snapshot of the entire database.
+- **Restore:** Select a `.db` backup file and click **Restore from Backup**. The current database is replaced (a safety copy is kept in `data/`). The page reloads automatically.

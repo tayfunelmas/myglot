@@ -20,6 +20,14 @@ def get_engine():
     return _engine
 
 
+def reset_engine() -> None:
+    """Dispose the current engine so the next call to get_engine() reconnects."""
+    global _engine
+    if _engine is not None:
+        _engine.dispose()
+        _engine = None
+
+
 def init_db() -> None:
     from . import models  # noqa: F401 — ensure models registered
     from .migrate import run_migrations

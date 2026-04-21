@@ -23,6 +23,10 @@ export async function initSettings() {
   // Categories management
   document.getElementById("btn-add-cat").addEventListener("click", addCategory);
   await loadCategoriesList();
+
+  // Backup & Restore
+  document.getElementById("btn-backup-db").addEventListener("click", backupDatabase);
+  document.getElementById("btn-restore-db").addEventListener("click", restoreDatabase);
 }
 
 async function saveSettings() {
@@ -149,5 +153,52 @@ async function loadCategoriesList() {
     });
   } catch (e) {
     container.innerHTML = `<p class="status error">${escapeHtml(e.message)}</p>`;
+  }
+}
+
+function backupDatabase() {
+  const status = document.getElementById("backup-status");
+  setStatus(status, "Preparing backup...", "loading");
+
+  const a = document.createElement("a");
+  a.href = "/api/backup";
+  a.click();
+  setStatus(status, "Backup download started!", "success");
+}
+
+async function restoreDatabase() {
+  const fileInput = document.getElementById("restore-file");
+  const status = document.getElementById("restore-status");
+
+  if (!fileInput.files || fileInput.files.length === 0) {
+    setStatus(status, "Please select a backup file first.", "error");
+    return;
+  }
+
+  if (
+    !confirm(
+      "This will replace ALL current data (items, categories, settings) with the backup. A safety copy of the current database will be kept. Continue?",
+    )
+  ) {
+    return;
+  }
+
+  setStatus(status, "Restoring...", "loading");
+
+  const form = new FormData();
+  form.append("file", fileInput.files[0]);
+
+  try {
+    const resp = await fetch("/api/restore", { method: "POST", body: form });
+    const data = await resp.json();
+    if (!resp.ok) {
+      const msg = data?.error?.message || data?.detail?.[0]?.msg || JSON.stringify(data);
+      throw new Error(msg);
+    }
+    setStatus(status, "Database restored! Reloading page...", "success");
+    fileInput.value = "";
+    setTimeout(() => window.location.reload(), 1000);
+  } catch (e) {
+    setStatus(status, e.message, "error");
   }
 }

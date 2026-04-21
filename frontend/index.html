@@ -89,6 +89,22 @@
                 </div>
                 <div id="categories-list" class="categories-list"></div>
             </div>
+
+            <hr>
+            <h3>Database Backup &amp; Restore</h3>
+            <div class="settings-form">
+                <p style="color:#495057;font-size:14px;margin-bottom:12px;">Download a snapshot of the entire database, or restore from a previous backup.</p>
+                <div class="form-row">
+                    <button type="button" id="btn-backup-db">Download Backup</button>
+                </div>
+                <div id="backup-status" class="status"></div>
+                <hr>
+                <div class="form-row">
+                    <input type="file" id="restore-file" accept=".db">
+                    <button type="button" id="btn-restore-db" class="danger">Restore from Backup</button>
+                </div>
+                <div id="restore-status" class="status"></div>
+            </div>
         </section>
     </main>
 
