@@ -113,7 +113,8 @@ async function loadCategoriesList() {
   try {
     const cats = await api.listCategories();
     if (cats.length === 0) {
-      container.innerHTML = '<p style="color:#868e96;">No categories yet.</p>';
+      container.innerHTML =
+        '<p style="color:var(--md-sys-color-on-surface-variant);">No categories yet.</p>';
       return;
     }
     container.innerHTML = cats
@@ -122,8 +123,8 @@ async function loadCategoriesList() {
             <div class="cat-row" data-id="${c.id}">
                 <span class="cat-name">${escapeHtml(c.name)}</span>
                 <span class="cat-count">${c.item_count} items</span>
-                <button class="small btn-rename-cat" data-id="${c.id}" data-name="${escapeHtml(c.name)}">Rename</button>
-                <button class="small danger btn-delete-cat" data-id="${c.id}">Delete</button>
+                <button class="small btn-rename-cat" data-id="${c.id}" data-name="${escapeHtml(c.name)}"><span class="material-symbols-rounded" style="font-size:16px;vertical-align:middle;">edit</span> Rename</button>
+                <button class="small danger btn-delete-cat" data-id="${c.id}"><span class="material-symbols-rounded" style="font-size:16px;vertical-align:middle;">delete</span> Delete</button>
             </div>`,
       )
       .join("");

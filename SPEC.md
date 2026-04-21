@@ -68,7 +68,7 @@ A personal, single-user web app for learning a target language by accumulating a
 
 ### 2.4 Reorder items
 1. On the Home tab, items are displayed in a **table** with drag handles on the left.
-2. User drags an item's handle (☰) to reorder it above or below other items.
+2. User drags an item's drag-indicator icon to reorder it above or below other items.
 3. The new order is persisted immediately via `POST /api/items/reorder`.
 4. On next visit, items appear in the saved order.
 
@@ -77,9 +77,9 @@ A personal, single-user web app for learning a target language by accumulating a
 2. Optionally selects one or more **categories** to filter (multi-select; selecting none shows all). The selection is **sticky** — persisted in `localStorage` and restored on next visit.
 3. Sees a **table** of the filtered items:
    - Source text.
-   - Target text (**hidden by default**; press a **Reveal** button to show it).
-   - **▶ Play** button (plays stored MP3).
-   - **🎤 Record** button (records mic audio in browser, sends to backend).
+   - Target text (**hidden by default**; press a visibility icon button to reveal/hide it).
+   - **Play** icon button (plays stored MP3).
+   - **Record** icon button — mic icon when idle, stop icon while recording (records mic audio in browser, sends to backend).
    - Backend runs STT → returns transcript + similarity score (ephemeral — not persisted).
    - UI shows: your transcript, the expected target text, a score (0–100), and a diff highlighting mismatched words. The score is displayed until the user navigates away; it is not saved.
 3. User can **Download audio** (MP3) per item.
@@ -144,7 +144,7 @@ A personal, single-user web app for learning a target language by accumulating a
 ┌─────────────────────────┐      HTTP/JSON      ┌──────────────────────────┐
 │   Browser (frontend)    │  ────────────────▶  │   Python backend (API)   │
 │   Vanilla HTML + JS     │                     │   FastAPI + Uvicorn      │
-│   (+ a little CSS)      │  ◀────────────────  │                          │
+│   Material Design 3     │  ◀────────────────  │                          │
 └─────────────────────────┘                     │  - Routes                │
         │  MediaRecorder (mic)                  │  - Services              │
         │  <audio> playback                     │  - SQLite via SQLModel   │
@@ -163,7 +163,7 @@ A personal, single-user web app for learning a target language by accumulating a
 ### 5.1 Tech choices
 - **Backend:** Python 3.11, **FastAPI**, Uvicorn, **SQLModel** (SQLAlchemy + Pydantic), SQLite, **croniter** (for cron expression parsing in the automatic backup scheduler).
 - **External AI providers:** pluggable behind abstract interfaces (see §8.1). Default stack is **Google Cloud** (Translate v2, Text-to-Speech, Speech-to-Text). A `fake` provider set is included for offline dev/testing. Additional providers (OpenAI, Deepgram, …) can be added via config without code changes in routes (see §8.3).
-- **Frontend:** Plain HTML + vanilla JS ES modules. No build step. One small CSS file. (Could swap to Alpine.js or HTMX later; kept vanilla to stay simple.)
+- **Frontend:** Plain HTML + vanilla JS ES modules + Material Design 3 theme (CSS custom properties, Google Material Symbols Rounded icons, Roboto font — loaded from Google Fonts CDN). No build step, no framework.
 - **DB:** SQLite file at `data/myglot.db`.
 - **Audio storage:** `data/audio/<uuid>.mp3`.
 - **Config:** `.env` file (python-dotenv) with `GOOGLE_APPLICATION_CREDENTIALS` path and optional defaults.
@@ -172,6 +172,7 @@ A personal, single-user web app for learning a target language by accumulating a
 - FastAPI: auto docs, simple async, type-safe.
 - SQLModel + SQLite: zero setup, single file, sufficient for a personal corpus up to ~tens of thousands of rows.
 - Vanilla JS: no toolchain, matches the "simple frontend" requirement.
+- Material Design 3 via CSS-only implementation: M3 design tokens as custom properties, no component library, keeps the zero-build-step constraint.
 
 ---
 
@@ -534,22 +535,42 @@ def delete(path: str) -> None: ...
 ```
 frontend/
   index.html          # shell + tabs: Home | Practice | Settings
-  styles.css
+  styles.css          # Material Design 3 theme (CSS custom properties)
+  biome.json          # Biome formatter/linter config
+  package.json        # frontend tooling (Biome dev dependency)
   js/
     api.js            # fetch wrappers
+    app.js            # tab switching + init
     home.js           # add + list items
     practice.js       # play/record/score
     settings.js       # languages + voice
     recorder.js       # MediaRecorder helper
-    util.js           # debounce, diff render
+    util.js           # debounce, diff render, escapeHtml, scoreClass
 ```
 
 Served by FastAPI as static files at `/` so everything is one origin (no CORS).
 
-### UI pages
-1. **Home** — input box + "Translate & Save" button; list of items below with edit + delete (regenerate audio lives in the edit modal).
-2. **Practice** — same list but emphasizes play + record + score; a "hide target" toggle.
-3. **Settings** — source lang, target lang (with BCP-47 examples), voice dropdown (populated via `/api/voices`).
+### 9.1 Design system — Material Design 3
+
+The UI follows **Google Material Design 3** conventions, implemented entirely via CSS custom properties and vanilla HTML/JS (no component library).
+
+- **Fonts:** Roboto (body text) and Material Symbols Rounded (icons), loaded from Google Fonts CDN.
+- **Color scheme:** Green primary (`#1a6b52`), M3 surface hierarchy, error/secondary/tertiary tonal palettes defined as CSS custom properties (`--md-sys-color-*`).
+- **Shape tokens:** `--md-sys-shape-corner-*` (xs 4px through xl 28px).
+- **Elevation:** Three shadow levels (`--md-sys-elevation-1/2/3`).
+- **Typography scale:** `--md-sys-typescale-*` tokens (body, label, title, headline sizes).
+- **Button variants:** `.btn-filled` (primary CTA), `.btn-tonal` (secondary), `.btn-outlined`, `.btn-text`, `.btn-danger`. All use pill shape (corner-xl).
+- **Icon buttons:** `.icon-btn` — 36px circular buttons with Material Symbols icons.
+- **Form fields:** M3 outlined text fields with floating labels (`.text-field`), outlined selects (`.select-field`), search fields with leading icon (`.search-field`).
+- **Cards:** `.card` with `.card-title`, `.card-subtitle`, `.card-description` sections.
+- **Modal dialog:** `.modal-overlay` + `.modal-surface` with fade-in / slide-up animations.
+- **Data tables:** `.items-table` with M3-style header, hover states, and row actions.
+- **Responsive:** Single breakpoint at 640px; meta column hides, filters stack vertically.
+
+### 9.2 UI pages
+1. **Home** — M3 card with add-item form (floating-label fields, translate/audio/add buttons); items table below with drag-indicator, play, edit, delete icon buttons. Edit modal for target text and category.
+2. **Practice** — items table with visibility toggle (blur/reveal), play, download, and record icon buttons. Record button pulses red while active. Results shown inline with score, transcript, and word diff.
+3. **Settings** — M3 cards for: language config + voice selection, category management (rows with rename/delete), provider health check, backup/restore, automatic backup schedule.
 
 ### Mic recording
 - `navigator.mediaDevices.getUserMedia({ audio: true })`.

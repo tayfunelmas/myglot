@@ -4,49 +4,98 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MyGlot</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
     <header>
-        <h1>MyGlot</h1>
-        <nav>
-            <button type="button" class="tab active" data-tab="home">Home</button>
-            <button type="button" class="tab" data-tab="practice">Practice</button>
-            <button type="button" class="tab" data-tab="settings">Settings</button>
+        <div class="app-bar">
+            <span class="material-symbols-rounded app-icon">translate</span>
+            <h1>MyGlot</h1>
+        </div>
+        <nav class="tabs">
+            <button type="button" class="tab active" data-tab="home">
+                <span class="material-symbols-rounded">home</span>
+                Home
+            </button>
+            <button type="button" class="tab" data-tab="practice">
+                <span class="material-symbols-rounded">mic</span>
+                Practice
+            </button>
+            <button type="button" class="tab" data-tab="settings">
+                <span class="material-symbols-rounded">settings</span>
+                Settings
+            </button>
         </nav>
     </header>
 
     <main>
         <!-- HOME TAB -->
         <section id="home" class="tab-content active">
-            <div class="add-form">
-                <h2>Add New Item</h2>
+            <div class="card add-form">
+                <h2 class="card-title">
+                    <span class="material-symbols-rounded">add_circle</span>
+                    Add New Item
+                </h2>
                 <div class="form-row">
-                    <textarea id="source-text" placeholder="Type a word, phrase, or sentence in your source language..." rows="2"></textarea>
+                    <div class="text-field">
+                        <textarea id="source-text" placeholder=" " rows="2"></textarea>
+                        <label for="source-text">Source language text</label>
+                    </div>
                 </div>
                 <div class="form-row">
-                    <textarea id="target-text" placeholder="Translation will appear here (or type your own)..." rows="2"></textarea>
+                    <div class="text-field">
+                        <textarea id="target-text" placeholder=" " rows="2"></textarea>
+                        <label for="target-text">Translation (or type your own)</label>
+                    </div>
                 </div>
-                <div class="form-row">
-                    <select id="category-select">
-                        <option value="">No category</option>
-                    </select>
-                    <input id="new-category" type="text" placeholder="Or type new category name...">
+                <div class="form-row form-row-inline">
+                    <div class="select-field">
+                        <select id="category-select">
+                            <option value="">No category</option>
+                        </select>
+                        <label>Category</label>
+                    </div>
+                    <div class="text-field compact">
+                        <input id="new-category" type="text" placeholder=" ">
+                        <label for="new-category">New category</label>
+                    </div>
                 </div>
                 <div class="form-row add-buttons">
-                    <button type="button" id="btn-translate">Translate</button>
-                    <button type="button" id="btn-translate-back">Translate back</button>
-                    <button type="button" id="btn-gen-audio">Generate Audio</button>
-                    <button type="button" id="btn-add-item" class="primary">Add Item</button>
+                    <button type="button" id="btn-translate" class="btn btn-tonal">
+                        <span class="material-symbols-rounded">translate</span>
+                        Translate
+                    </button>
+                    <button type="button" id="btn-translate-back" class="btn btn-tonal">
+                        <span class="material-symbols-rounded">swap_horiz</span>
+                        Translate back
+                    </button>
+                    <button type="button" id="btn-gen-audio" class="btn btn-tonal">
+                        <span class="material-symbols-rounded">volume_up</span>
+                        Generate Audio
+                    </button>
+                    <button type="button" id="btn-add-item" class="btn btn-filled">
+                        <span class="material-symbols-rounded">add</span>
+                        Add Item
+                    </button>
                 </div>
                 <div id="audio-preview"></div>
                 <div id="add-status" class="status"></div>
             </div>
 
-            <div class="list-controls">
-                <h2>Your Items</h2>
+            <div class="list-header">
+                <h2 class="section-title">
+                    <span class="material-symbols-rounded">list</span>
+                    Your Items
+                </h2>
                 <div class="filters">
-                    <input id="home-search" type="text" placeholder="Search...">
+                    <div class="text-field compact search-field">
+                        <span class="material-symbols-rounded field-icon">search</span>
+                        <input id="home-search" type="text" placeholder="Search...">
+                    </div>
                     <select id="home-category-filter" multiple>
                     </select>
                 </div>
@@ -56,7 +105,10 @@
 
         <!-- PRACTICE TAB -->
         <section id="practice" class="tab-content">
-            <h2>Practice</h2>
+            <h2 class="section-title">
+                <span class="material-symbols-rounded">fitness_center</span>
+                Practice
+            </h2>
             <div class="filters">
                 <select id="practice-category-filter" multiple>
                 </select>
@@ -66,96 +118,158 @@
 
         <!-- SETTINGS TAB -->
         <section id="settings" class="tab-content">
-            <h2>Settings</h2>
-            <div class="settings-form">
-                <label>Source Language (BCP-47)
-                    <input id="setting-source-lang" type="text" placeholder="en-US">
-                </label>
-                <label>Target Language (BCP-47)
-                    <input id="setting-target-lang" type="text" placeholder="de-DE">
-                </label>
-                <label>TTS Voice
+            <h2 class="section-title">
+                <span class="material-symbols-rounded">settings</span>
+                Settings
+            </h2>
+
+            <div class="card settings-form">
+                <h3 class="card-subtitle">
+                    <span class="material-symbols-rounded">language</span>
+                    Language Configuration
+                </h3>
+                <div class="text-field">
+                    <input id="setting-source-lang" type="text" placeholder=" ">
+                    <label for="setting-source-lang">Source Language (BCP-47)</label>
+                </div>
+                <div class="text-field">
+                    <input id="setting-target-lang" type="text" placeholder=" ">
+                    <label for="setting-target-lang">Target Language (BCP-47)</label>
+                </div>
+                <div class="select-field">
                     <select id="setting-tts-voice">
                         <option value="">Default (auto-select)</option>
                     </select>
-                </label>
-                <button type="button" id="btn-load-voices">Load Voices for Target Language</button>
-                <button type="button" id="btn-save-settings" class="primary">Save Settings</button>
+                    <label>TTS Voice</label>
+                </div>
+                <div class="form-row">
+                    <button type="button" id="btn-load-voices" class="btn btn-outlined">
+                        <span class="material-symbols-rounded">record_voice_over</span>
+                        Load Voices
+                    </button>
+                    <button type="button" id="btn-save-settings" class="btn btn-filled">
+                        <span class="material-symbols-rounded">save</span>
+                        Save Settings
+                    </button>
+                </div>
                 <div id="settings-status" class="status"></div>
+            </div>
 
-                <hr>
-                <h3>Provider Status</h3>
-                <button type="button" id="btn-test-providers">Test Providers</button>
+            <div class="card">
+                <h3 class="card-subtitle">
+                    <span class="material-symbols-rounded">check_circle</span>
+                    Provider Status
+                </h3>
+                <button type="button" id="btn-test-providers" class="btn btn-tonal">
+                    <span class="material-symbols-rounded">speed</span>
+                    Test Providers
+                </button>
                 <div id="provider-status" class="provider-status"></div>
             </div>
 
-            <hr>
-            <h3>Manage Categories</h3>
-            <div class="category-manager">
-                <div class="form-row">
-                    <input id="new-cat-name" type="text" placeholder="New category name...">
-                    <button type="button" id="btn-add-cat">Add Category</button>
+            <div class="card category-manager">
+                <h3 class="card-subtitle">
+                    <span class="material-symbols-rounded">category</span>
+                    Manage Categories
+                </h3>
+                <div class="form-row form-row-inline">
+                    <div class="text-field compact">
+                        <input id="new-cat-name" type="text" placeholder=" ">
+                        <label for="new-cat-name">New category name</label>
+                    </div>
+                    <button type="button" id="btn-add-cat" class="btn btn-tonal">
+                        <span class="material-symbols-rounded">add</span>
+                        Add
+                    </button>
                 </div>
                 <div id="categories-list" class="categories-list"></div>
             </div>
 
-            <hr>
-            <h3>Database Backup &amp; Restore</h3>
-            <div class="settings-form">
-                <p style="color:#495057;font-size:14px;margin-bottom:12px;">Download a snapshot of the entire database, or restore from a previous backup.</p>
+            <div class="card">
+                <h3 class="card-subtitle">
+                    <span class="material-symbols-rounded">backup</span>
+                    Database Backup &amp; Restore
+                </h3>
+                <p class="card-description">Download a snapshot of the entire database, or restore from a previous backup.</p>
                 <div class="form-row">
-                    <button type="button" id="btn-backup-db">Download Backup</button>
+                    <button type="button" id="btn-backup-db" class="btn btn-tonal">
+                        <span class="material-symbols-rounded">download</span>
+                        Download Backup
+                    </button>
                 </div>
                 <div id="backup-status" class="status"></div>
-                <hr>
-                <div class="form-row">
-                    <input type="file" id="restore-file" accept=".db">
-                    <button type="button" id="btn-restore-db" class="danger">Restore from Backup</button>
+                <div class="divider"></div>
+                <div class="form-row form-row-inline">
+                    <input type="file" id="restore-file" accept=".db" class="file-input">
+                    <button type="button" id="btn-restore-db" class="btn btn-danger">
+                        <span class="material-symbols-rounded">restore</span>
+                        Restore from Backup
+                    </button>
                 </div>
                 <div id="restore-status" class="status"></div>
             </div>
 
-            <hr>
-            <h3>Automatic Backups</h3>
-            <div class="settings-form">
-                <p style="color:#495057;font-size:14px;margin-bottom:12px;">Schedule automatic database backups using a cron expression.</p>
-                <label>
-                    <input type="checkbox" id="autobackup-enabled"> Enable automatic backups
+            <div class="card">
+                <h3 class="card-subtitle">
+                    <span class="material-symbols-rounded">schedule</span>
+                    Automatic Backups
+                </h3>
+                <p class="card-description">Schedule automatic database backups using a cron expression.</p>
+                <label class="checkbox-field">
+                    <input type="checkbox" id="autobackup-enabled">
+                    <span>Enable automatic backups</span>
                 </label>
-                <label>Cron Expression
-                    <input id="autobackup-cron" type="text" placeholder="0 2 * * *">
-                    <small style="color:#868e96;">e.g. <code>0 2 * * *</code> = daily at 2 AM, <code>0 */6 * * *</code> = every 6 hours</small>
-                </label>
-                <label>Destination Directory (absolute path, empty = default)
-                    <input id="autobackup-dest" type="text" placeholder="/path/to/backups">
-                </label>
-                <label>Max Backups to Keep
-                    <input id="autobackup-max" type="number" min="1" value="7">
-                </label>
-                <button type="button" id="btn-save-autobackup" class="primary">Save Schedule</button>
+                <div class="text-field">
+                    <input id="autobackup-cron" type="text" placeholder=" ">
+                    <label for="autobackup-cron">Cron Expression</label>
+                    <span class="field-hint">e.g. <code>0 2 * * *</code> = daily at 2 AM, <code>0 */6 * * *</code> = every 6 hours</span>
+                </div>
+                <div class="text-field">
+                    <input id="autobackup-dest" type="text" placeholder=" ">
+                    <label for="autobackup-dest">Destination Directory (empty = default)</label>
+                </div>
+                <div class="text-field compact">
+                    <input id="autobackup-max" type="number" min="1" value="7" placeholder=" ">
+                    <label for="autobackup-max">Max Backups to Keep</label>
+                </div>
+                <button type="button" id="btn-save-autobackup" class="btn btn-filled">
+                    <span class="material-symbols-rounded">save</span>
+                    Save Schedule
+                </button>
                 <div id="autobackup-status" class="status"></div>
-                <div id="autobackup-last" style="color:#495057;font-size:13px;margin-top:8px;"></div>
+                <div id="autobackup-last" class="field-hint" style="margin-top:8px;"></div>
             </div>
         </section>
     </main>
 
     <!-- Edit Modal -->
-    <div id="edit-modal" class="modal hidden">
-        <div class="modal-content">
-            <h3>Edit Item</h3>
+    <div id="edit-modal" class="modal-overlay hidden">
+        <div class="modal-surface">
+            <h3 class="modal-title">
+                <span class="material-symbols-rounded">edit</span>
+                Edit Item
+            </h3>
             <input type="hidden" id="edit-item-id">
-            <label>Target Text
-                <textarea id="edit-target-text" rows="3"></textarea>
-            </label>
-            <label>Category
+            <div class="text-field">
+                <textarea id="edit-target-text" rows="3" placeholder=" "></textarea>
+                <label for="edit-target-text">Target Text</label>
+            </div>
+            <div class="select-field">
                 <select id="edit-category-select">
                     <option value="0">No category</option>
                 </select>
-            </label>
+                <label>Category</label>
+            </div>
             <div class="modal-actions">
-                <button type="button" id="btn-edit-save" class="primary">Save</button>
-                <button type="button" id="btn-edit-regen">Regenerate audio</button>
-                <button type="button" id="btn-edit-cancel">Cancel</button>
+                <button type="button" id="btn-edit-cancel" class="btn btn-text">Cancel</button>
+                <button type="button" id="btn-edit-regen" class="btn btn-tonal">
+                    <span class="material-symbols-rounded">refresh</span>
+                    Regenerate audio
+                </button>
+                <button type="button" id="btn-edit-save" class="btn btn-filled">
+                    <span class="material-symbols-rounded">save</span>
+                    Save
+                </button>
             </div>
             <div id="edit-status" class="status"></div>
         </div>

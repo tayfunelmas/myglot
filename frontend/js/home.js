@@ -169,7 +169,7 @@ export async function loadItems() {
     const data = await api.listItems(params);
     if (data.items.length === 0) {
       container.innerHTML =
-        '<p style="color:#868e96; text-align:center;">No items yet. Add one above!</p>';
+        '<p style="color:var(--md-sys-color-on-surface-variant); text-align:center;">No items yet. Add one above!</p>';
     } else {
       container.innerHTML = `
         <table class="items-table">
@@ -201,15 +201,15 @@ function renderHomeItem(item) {
   const staleBadge = item.audio_stale ? '<span class="stale-badge">stale</span>' : "";
   return `
     <tr class="item-row" draggable="true" data-id="${item.id}">
-      <td class="col-drag"><span class="drag-handle" title="Drag to reorder">&#9776;</span></td>
+      <td class="col-drag"><span class="drag-handle material-symbols-rounded" title="Drag to reorder">drag_indicator</span></td>
       <td class="col-source">${escapeHtml(item.source_text)}</td>
       <td class="col-target">${escapeHtml(item.target_text)} ${staleBadge}</td>
       <td class="col-meta">${catBadge}</td>
       <td class="col-actions">
         <div class="row-actions">
-          ${item.audio_url ? `<button type="button" class="icon-btn btn-play" data-id="${item.id}" title="Play audio">&#9654;</button>` : ""}
-          <button type="button" class="icon-btn btn-edit" data-id="${item.id}" title="Edit">&#9998;</button>
-          <button type="button" class="icon-btn danger btn-delete" data-id="${item.id}" title="Delete">&#10005;</button>
+          ${item.audio_url ? `<button type="button" class="icon-btn btn-play" data-id="${item.id}" title="Play audio"><span class="material-symbols-rounded">play_arrow</span></button>` : ""}
+          <button type="button" class="icon-btn btn-edit" data-id="${item.id}" title="Edit"><span class="material-symbols-rounded">edit</span></button>
+          <button type="button" class="icon-btn danger btn-delete" data-id="${item.id}" title="Delete"><span class="material-symbols-rounded">delete</span></button>
         </div>
         <audio id="audio-${item.id}" preload="none"></audio>
       </td>

@@ -23,7 +23,7 @@ export async function loadPracticeItems() {
     const data = await api.listItems(params);
     if (data.items.length === 0) {
       container.innerHTML =
-        '<p style="color:#868e96; text-align:center;">No items to practice. Add some from the Home tab!</p>';
+        '<p style="color:var(--md-sys-color-on-surface-variant); text-align:center;">No items to practice. Add some from the Home tab!</p>';
     } else {
       container.innerHTML = `
         <table class="items-table practice-table">
@@ -59,10 +59,10 @@ function renderPracticeItem(item) {
       <td class="col-meta">${catBadge}</td>
       <td class="col-actions">
         <div class="row-actions">
-          <button type="button" class="icon-btn btn-reveal" data-id="${item.id}" title="Reveal / Hide">&#128065;</button>
-          ${item.audio_url ? `<button type="button" class="icon-btn btn-play" data-id="${item.id}" title="Play audio">&#9654;</button>` : ""}
-          ${item.audio_url ? `<a href="${api.audioDownloadUrl(item.id)}" class="icon-btn" title="Download audio" style="text-decoration:none;">&#11015;</a>` : ""}
-          <button type="button" class="icon-btn btn-record" data-id="${item.id}" title="Record">&#127908;</button>
+          <button type="button" class="icon-btn btn-reveal" data-id="${item.id}" title="Reveal / Hide"><span class="material-symbols-rounded">visibility</span></button>
+          ${item.audio_url ? `<button type="button" class="icon-btn btn-play" data-id="${item.id}" title="Play audio"><span class="material-symbols-rounded">play_arrow</span></button>` : ""}
+          ${item.audio_url ? `<a href="${api.audioDownloadUrl(item.id)}" class="icon-btn" title="Download audio"><span class="material-symbols-rounded">download</span></a>` : ""}
+          <button type="button" class="icon-btn btn-record" data-id="${item.id}" title="Record"><span class="material-symbols-rounded">mic</span></button>
         </div>
         <audio id="practice-audio-${item.id}" preload="none"></audio>
         <div id="result-${item.id}"></div>
@@ -80,11 +80,11 @@ function attachPracticeListeners() {
       if (revealed) {
         el.classList.add("hidden-text");
         el.dataset.revealed = "false";
-        btn.textContent = "Reveal";
+        btn.innerHTML = '<span class="material-symbols-rounded">visibility</span>';
       } else {
         el.classList.remove("hidden-text");
         el.dataset.revealed = "true";
-        btn.textContent = "Hide";
+        btn.innerHTML = '<span class="material-symbols-rounded">visibility_off</span>';
       }
     });
   });
@@ -106,7 +106,7 @@ function attachPracticeListeners() {
 
       if (recorder.recording) {
         // Stop recording
-        btn.textContent = "&#127908; Record";
+        btn.innerHTML = '<span class="material-symbols-rounded">mic</span>';
         btn.classList.remove("recording");
         const blob = await recorder.stop();
 
@@ -128,7 +128,7 @@ function attachPracticeListeners() {
         // Start recording
         try {
           await recorder.start();
-          btn.textContent = "⏹ Stop";
+          btn.innerHTML = '<span class="material-symbols-rounded">stop</span>';
           btn.classList.add("recording");
         } catch (e) {
           alert(`Could not access microphone: ${e.message}`);
