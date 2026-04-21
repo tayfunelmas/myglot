@@ -517,7 +517,7 @@ frontend/
 Served by FastAPI as static files at `/` so everything is one origin (no CORS).
 
 ### UI pages
-1. **Home** — input box + "Translate & Save" button; list of items below with inline edit + regenerate + delete.
+1. **Home** — input box + "Translate & Save" button; list of items below with edit + delete (regenerate audio lives in the edit modal).
 2. **Practice** — same list but emphasizes play + record + score; a "hide target" toggle.
 3. **Settings** — source lang, target lang (with BCP-47 examples), voice dropdown (populated via `/api/voices`).
 
@@ -882,7 +882,7 @@ Both the Home and Practice tabs use an HTML `<table>` layout with columns: sourc
 Category filters on Home and Practice are `<select multiple>` elements. Selections are persisted to `localStorage` (keys `myglot_home-category-filter` and `myglot_practice-category-filter`) and restored on page load. The backend accepts `category_ids` as comma-separated integers.
 
 ### 16.13 Regenerate audio always visible
-The regenerate audio button (↻) is always shown in the Home table, not only when `audio_stale` is true. This allows re-generating audio after changing the TTS voice in Settings.
+The **Regenerate audio** action is always available from the **Edit** modal (not only when `audio_stale` is true). This allows re-generating audio after changing the TTS voice in Settings.
 
 ### 16.14 Database backup & restore
 - **Backup** (`GET /api/backup`): uses SQLite's Online Backup API to create a consistent, lock-free copy of the database, served as a timestamped `.db` file download.

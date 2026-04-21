@@ -22,6 +22,10 @@ task up
 # 4. Open http://localhost:8000
 ```
 
+## Usage notes
+
+- To edit an item (or regenerate its audio), click the **Edit** (pencil) button in the Home list to open the edit dialog.
+
 ## Development (without Docker)
 
 ```bash

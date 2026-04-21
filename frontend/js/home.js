@@ -18,6 +18,7 @@ export async function initHome() {
 
   // Edit modal
   document.getElementById("btn-edit-save").addEventListener("click", saveEdit);
+  document.getElementById("btn-edit-regen").addEventListener("click", regenerateFromEditModal);
   document.getElementById("btn-edit-cancel").addEventListener("click", closeEditModal);
 }
 
@@ -191,7 +192,6 @@ function renderHomeItem(item) {
         <div class="row-actions">
           ${item.audio_url ? `<button type="button" class="icon-btn btn-play" data-id="${item.id}" title="Play audio">&#9654;</button>` : ""}
           <button type="button" class="icon-btn btn-edit" data-id="${item.id}" title="Edit">&#9998;</button>
-          <button type="button" class="icon-btn btn-regen" data-id="${item.id}" title="Regenerate audio">&#8635;</button>
           <button type="button" class="icon-btn danger btn-delete" data-id="${item.id}" title="Delete">&#10005;</button>
         </div>
         <audio id="audio-${item.id}" preload="none"></audio>
@@ -278,19 +278,6 @@ function attachHomeListeners() {
     btn.addEventListener("click", () => openEditModal(parseInt(btn.dataset.id, 10)));
   });
 
-  document.querySelectorAll("#items-list .btn-regen").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      btn.textContent = "Regenerating...";
-      btn.disabled = true;
-      try {
-        await api.regenerateAudio(parseInt(btn.dataset.id, 10));
-        await loadItems();
-      } catch (e) {
-        alert(e.message);
-      }
-    });
-  });
-
   document.querySelectorAll("#items-list .btn-delete").forEach((btn) => {
     btn.addEventListener("click", async () => {
       if (!confirm("Delete this item?")) return;
@@ -336,5 +323,40 @@ async function saveEdit() {
     await loadItems();
   } catch (e) {
     setStatus(status, e.message, "error");
+  }
+}
+
+async function regenerateFromEditModal() {
+  const id = parseInt(document.getElementById("edit-item-id").value, 10);
+  const targetText = document.getElementById("edit-target-text").value.trim();
+  const categoryId = parseInt(document.getElementById("edit-category-select").value, 10);
+  const status = document.getElementById("edit-status");
+  const btnRegen = document.getElementById("btn-edit-regen");
+  const btnSave = document.getElementById("btn-edit-save");
+
+  if (!targetText) {
+    setStatus(status, "Target text cannot be empty", "error");
+    return;
+  }
+
+  const prevLabel = btnRegen.textContent;
+  btnRegen.textContent = "Regenerating...";
+  btnRegen.disabled = true;
+  btnSave.disabled = true;
+  setStatus(status, "Regenerating audio...", "loading");
+
+  try {
+    // Ensure any edits are saved before regenerating audio.
+    await api.updateItem(id, { target_text: targetText, category_id: categoryId });
+    await api.regenerateAudio(id);
+    setStatus(status, "Audio regenerated.", "success");
+    await loadCategories();
+    await loadItems();
+  } catch (e) {
+    setStatus(status, e.message, "error");
+  } finally {
+    btnRegen.textContent = prevLabel;
+    btnRegen.disabled = false;
+    btnSave.disabled = false;
   }
 }

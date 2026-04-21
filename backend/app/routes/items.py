@@ -109,9 +109,7 @@ def translate_text(data: TranslateRequest, session: Session = Depends(get_sessio
     settings = _get_settings(session)
     try:
         translator = get_translator()
-        target_text = translator.translate(
-            source_text, settings.source_lang, settings.target_lang
-        )
+        target_text = translator.translate(source_text, settings.source_lang, settings.target_lang)
     except ProviderError as e:
         raise ProviderAPIError("translator", str(e)) from e
     return TranslateResponse(target_text=target_text)
