@@ -2,7 +2,7 @@
 
 A personal, single-user web app for learning a target language by accumulating and practicing your own most-used words, phrases, and sentences.
 
-> **Status:** Draft for review. Please edit inline or leave comments before implementation starts.
+> **Status:** Living document. Updated as code evolves. Reflects the current implementation.
 
 > **Maintenance rules:**
 > - Any change to design, architecture, or code organization **must** update this SPEC file to stay in sync.
@@ -161,8 +161,8 @@ A personal, single-user web app for learning a target language by accumulating a
 ```
 
 ### 5.1 Tech choices
-- **Backend:** Python 3.11, **FastAPI**, Uvicorn, **SQLModel** (SQLAlchemy + Pydantic), SQLite.
-- **External AI providers:** pluggable behind abstract interfaces (see §8.1). Default stack is **Google Cloud** (Translate v3, Text-to-Speech, Speech-to-Text); alternative implementations (OpenAI, Deepgram, …) can be swapped in via config without code changes in routes.
+- **Backend:** Python 3.11, **FastAPI**, Uvicorn, **SQLModel** (SQLAlchemy + Pydantic), SQLite, **croniter** (for cron expression parsing in the automatic backup scheduler).
+- **External AI providers:** pluggable behind abstract interfaces (see §8.1). Default stack is **Google Cloud** (Translate v2, Text-to-Speech, Speech-to-Text). A `fake` provider set is included for offline dev/testing. Additional providers (OpenAI, Deepgram, …) can be added via config without code changes in routes (see §8.3).
 - **Frontend:** Plain HTML + vanilla JS ES modules. No build step. One small CSS file. (Could swap to Alpine.js or HTMX later; kept vanilla to stay simple.)
 - **DB:** SQLite file at `data/myglot.db`.
 - **Audio storage:** `data/audio/<uuid>.mp3`.
@@ -296,11 +296,11 @@ Base path: `/api`. All JSON unless noted.
 | PUT    | `/api/settings`              | `{source_lang, target_lang, tts_voice?}`                    | Settings |
 | GET    | `/api/voices?lang=de-DE`     | —                                                           | `[{name, gender, natural_sample_rate}]` |
 | GET    | `/api/categories`            | —                                                           | `[{id, name, item_count}]` |
-| POST   | `/api/categories`            | `{name}`                                                    | `Category` |
+| POST   | `/api/categories`            | `{name}`                                                    | `201` + `Category` |
 | PATCH  | `/api/categories/{id}`       | `{name}`                                                    | `Category` |
 | DELETE | `/api/categories/{id}`       | —                                                           | `204` (items become uncategorized) |
 | GET    | `/api/items?q=&category_id=&category_ids=&limit=&offset=` | `category_ids`: comma-separated IDs for multi-filter | `{items:[Item], total}` |
-| POST   | `/api/items/reorder`         | `{item_ids:[int]}`                                          | `{status:"ok"}` |
+| POST   | `/api/items/reorder`         | `{item_ids:[int]}`                                          | `204` (no body) |
 | GET    | `/api/backup`                | —                                                           | `application/x-sqlite3` (attachment) |
 | POST   | `/api/restore`               | multipart: `file` (.db)                                     | `{status:"ok", message:"..."}` |
 | GET    | `/api/backup-schedule`       | —                                                           | `BackupSchedule` |
@@ -308,7 +308,7 @@ Base path: `/api`. All JSON unless noted.
 | POST   | `/api/translate`             | `{source_text}`                                             | `{target_text}` |
 | POST   | `/api/translate-back`        | `{target_text}`                                             | `{source_text}` — reverse translation (target→source) |
 | POST   | `/api/tts/preview`           | `{text}`                                                    | `audio/mpeg` (inline binary) |
-| POST   | `/api/items`                 | `{source_text, target_text?, category_id?}` — if `target_text` provided, translation is skipped | `Item` (with `target_text`, `audio_url`) |
+| POST   | `/api/items`                 | `{source_text, target_text?, category_id?, category_name?}` — if `target_text` provided, translation is skipped | `201` + `Item` (with `target_text`, `audio_url`) |
 | GET    | `/api/items/{id}`            | —                                                           | `Item` |
 | PATCH  | `/api/items/{id}`            | `{target_text?, category_id?}`                              | `Item` (sets `audio_stale=true` if `target_text` changed) |
 | POST   | `/api/items/{id}/regenerate-audio` | —                                                     | `Item` (fresh `audio_url`, `audio_stale=false`) |
@@ -327,6 +327,7 @@ Base path: `/api`. All JSON unless noted.
   "target_text": "Guten Morgen",
   "audio_url": "/api/items/42/audio",
   "audio_voice": "de-DE-Wavenet-B",
+  "audio_provider": "google",
   "audio_stale": false,
   "category": {"id": 3, "name": "Greetings"},
   "created_at": "2026-04-17T10:00:00Z",
@@ -339,7 +340,7 @@ Uniform envelope:
 ```json
 { "error": { "code": "GOOGLE_API_ERROR", "message": "..." } }
 ```
-Common codes: `VALIDATION_ERROR`, `NOT_FOUND`, `GOOGLE_API_ERROR`, `AUDIO_MISSING`.
+Common codes: `VALIDATION_ERROR`, `NOT_FOUND`, `PROVIDER_API_ERROR`, `PROVIDER_NOT_CONFIGURED`, `AUDIO_MISSING`.
 
 ---
 
@@ -352,30 +353,27 @@ backend/
     config.py               # env + settings
     db.py                   # SQLModel engine, session
     migrate.py              # versioned migration runner
-    models.py               # Item, Settings, Category
+    models.py               # Item, Settings, Category, BackupSchedule
     schemas.py              # Pydantic DTOs
+    errors.py               # Uniform error classes (AppError, NotFoundError, etc.)
+    scheduler.py            # Background task: automatic backup runner (croniter)
     routes/
       items.py
       categories.py
       settings.py
       voices.py
-      health.py
+      health.py             # includes /backup, /restore, /backup-schedule routes
     migrations/             # numbered migration scripts (see §6.2)
       __init__.py
       001_add_sort_order.py
       002_add_backup_schedule.py
     providers/              # pluggable external services (see §8.1)
-      __init__.py           # registry + factory
-      base.py               # abstract interfaces + DTOs
+      __init__.py
+      base.py               # abstract interfaces (ABC) + DTOs
+      registry.py           # factory functions get_translator(), get_tts(), get_stt() cached with @lru_cache
       google/
-        translate.py
+        translate.py         # Uses Google Translate v2 (not v3)
         tts.py
-        stt.py
-      openai/               # optional, v1.1
-        translate.py
-        tts.py
-        stt.py
-      deepgram/             # optional, v1.1
         stt.py
       fake/                 # in-memory stubs for tests / offline dev
         translate.py
@@ -384,13 +382,10 @@ backend/
     services/
       similarity.py         # scoring + diff (pure, no provider)
       audio_store.py        # paths, atomic replace, delete
-    errors.py
-  tests/
-    test_similarity.py
-    test_items_api.py       # uses FakeProviders, no network
-    test_providers_google.py  # marked @network, opt-in
+  tests/                    # (not yet created)
   pyproject.toml
-  .env.example
+  requirements.txt
+  Dockerfile
 ```
 
 ### 8.1 Provider abstraction
@@ -399,10 +394,11 @@ Translation, TTS, and STT are each defined as an **abstract interface** (Python 
 
 ```python
 # app/providers/base.py
-from typing import Protocol, Literal
+from abc import ABC, abstractmethod
 
-class Translator(Protocol):
+class Translator(ABC):
     name: str
+    @abstractmethod
     def translate(self, text: str, source_lang: str, target_lang: str) -> str: ...
 
 class Voice(BaseModel):
@@ -417,18 +413,21 @@ class TTSResult(BaseModel):
     mime: str               # e.g. "audio/mpeg"
     voice_id: str           # what was actually used (after defaulting)
 
-class TTS(Protocol):
+class TTS(ABC):
     name: str
+    @abstractmethod
     def synthesize(self, text: str, lang: str, voice_id: str | None) -> TTSResult: ...
+    @abstractmethod
     def list_voices(self, lang: str) -> list[Voice]: ...
 
 class STTResult(BaseModel):
     transcript: str
     confidence: float | None = None
 
-class STT(Protocol):
+class STT(ABC):
     name: str
     # mime examples: "audio/webm;codecs=opus", "audio/wav"
+    @abstractmethod
     def transcribe(self, audio_bytes: bytes, mime: str, lang: str) -> STTResult: ...
 
 class ProviderError(Exception): ...        # wraps vendor SDK errors uniformly
@@ -436,39 +435,38 @@ class ProviderNotConfigured(ProviderError): ...
 ```
 
 Rules for implementations:
-- Each concrete class (`GoogleTranslator`, `OpenAITTS`, `DeepgramSTT`, …) **must** accept its config (API key, endpoint overrides) via constructor and do all I/O internally — no globals.
-- They must raise `ProviderError` (with a human message) on failure; never leak vendor-specific exception types to routes.
-- They must normalize language codes: accept BCP-47 (`de-DE`) and internally convert to whatever the vendor wants (e.g. Google Translate uses `de`, Deepgram uses `de-DE`).
+- Each concrete class (`GoogleTranslator`, `GoogleTTS`, `GoogleSTT`, `FakeTranslator`, …) does all I/O internally — no globals (except a lazy-init module-level `_client` singleton per Google provider module, see §16.2).
+- They must raise `ProviderError` (with a human message) on failure; never leak vendor-specific exception types to routes. Routes catch `ProviderError` and convert to `ProviderAPIError` (HTTP 503, code `PROVIDER_API_ERROR`).
+- They must normalize language codes: accept BCP-47 (`de-DE`) and internally convert to whatever the vendor wants (e.g. Google Translate v2 uses `de`, Deepgram would use `de-DE`).
+- **Google Translate:** uses the **v2** API (`google.cloud.translate_v2.Client`), not v3. The `google-cloud-translate` pip package includes both; v2 was chosen for simplicity.
 - Voice IDs are treated as **opaque strings** by the app. `Voice.id` from one provider is not expected to work with another. When the user switches providers, the voice dropdown repopulates and the stored `tts_voice` is cleared if it's no longer valid.
 - The filesystem audio layer (`audio_store`) is provider-agnostic; it just persists the `audio_bytes` returned by any TTS provider (extension inferred from `mime`).
 
 ### 8.2 Provider registry & factory
 
 ```python
-# app/providers/__init__.py
+# app/providers/registry.py (simplified)
 _REGISTRY = {
     "translator": {
-        "google":   lambda cfg: GoogleTranslator(cfg),
-        "openai":   lambda cfg: OpenAITranslator(cfg),
-        "fake":     lambda cfg: FakeTranslator(cfg),
+        "google":   lambda cfg: GoogleTranslator(),
+        "fake":     lambda cfg: FakeTranslator(),
     },
     "tts": {
-        "google":   lambda cfg: GoogleTTS(cfg),
-        "openai":   lambda cfg: OpenAITTS(cfg),
-        "fake":     lambda cfg: FakeTTS(cfg),
+        "google":   lambda cfg: GoogleTTS(),
+        "fake":     lambda cfg: FakeTTS(),
     },
     "stt": {
-        "google":   lambda cfg: GoogleSTT(cfg),
-        "openai":   lambda cfg: OpenAISTT(cfg),
-        "deepgram": lambda cfg: DeepgramSTT(cfg),
-        "fake":     lambda cfg: FakeSTT(cfg),
+        "google":   lambda cfg: GoogleSTT(),
+        "fake":     lambda cfg: FakeSTT(),
     },
 }
 
-def build_translator(cfg) -> Translator: ...
-def build_tts(cfg) -> TTS: ...
-def build_stt(cfg) -> STT: ...
+def get_translator() -> Translator: ...   # @lru_cache
+def get_tts() -> TTS: ...                 # @lru_cache
+def get_stt() -> STT: ...                 # @lru_cache
 ```
+
+> **Note:** OpenAI and Deepgram providers are not yet implemented. The registry uses if/elif dispatch rather than a dict. Adding a new provider means adding a new branch in the `_build_*` functions and the corresponding module under `app/providers/<vendor>/`.
 
 FastAPI wires these as cached dependencies:
 ```python
@@ -477,36 +475,36 @@ def get_translator() -> Translator: return build_translator(load_config())
 # used in routes as:  translator: Translator = Depends(get_translator)
 ```
 
-Swapping a provider = change env var + restart. Adding a new provider = drop a new file under `app/providers/<vendor>/` and register it; no route changes.
+Swapping a provider = change env var + restart. Adding a new provider = add a new file under `app/providers/<vendor>/`, add a branch in `registry.py`'s `_build_*` functions; no route changes.
 
 ### 8.3 Selecting providers via config
 
-Extend `.env` (see §10.2) with **per-capability** selectors so you can mix vendors (e.g., Google TTS + Deepgram STT + OpenAI Translate):
+Extend `.env` (see §10.2) with **per-capability** selectors so you can mix vendors (e.g., Google TTS + fake STT for offline dev):
 
 ```dotenv
-# One of: google | openai | fake
+# Currently implemented: google | fake
 MYGLOT_TRANSLATE_PROVIDER=google
-# One of: google | openai | fake
 MYGLOT_TTS_PROVIDER=google
-# One of: google | openai | deepgram | fake
 MYGLOT_STT_PROVIDER=google
 
-# Vendor credentials (only the ones you use need to be set)
+# Vendor credentials — only set the ones your selected providers need.
 GOOGLE_APPLICATION_CREDENTIALS=./secrets/gcp.json
-OPENAI_API_KEY=
-DEEPGRAM_API_KEY=
+# Planned (not yet implemented):
+# OPENAI_API_KEY=
+# DEEPGRAM_API_KEY=
 ```
 
-Validation at startup: for each selected provider, verify its required env vars are present; otherwise mark that capability **degraded** and surface a clear error from the relevant endpoints (`503 PROVIDER_NOT_CONFIGURED` with the capability and provider name).
+Validation at startup: for each selected provider, the registry checks it is a known name (`google` or `fake`). Unknown names raise `ProviderNotConfigured`. For Google providers, the Google SDK reads credentials from `GOOGLE_APPLICATION_CREDENTIALS` automatically.
 
-The `GET /api/health/google` endpoint from §10.3 generalizes to **`GET /api/health/providers`** returning per-capability status:
+`GET /api/health/providers` returns per-capability status:
 ```json
 {
   "translator": {"provider":"google","ok":true},
-  "tts":        {"provider":"google","ok":true,"voice_count":42},
-  "stt":        {"provider":"deepgram","ok":false,"error":"DEEPGRAM_API_KEY missing"}
+  "tts":        {"provider":"google","ok":true},
+  "stt":        {"provider":"fake","ok":true}
 }
 ```
+Each capability reports `ok: false` with an `error` string if the provider cannot be instantiated.
 
 ### 8.4 Impact on the data model
 
@@ -514,8 +512,9 @@ The `GET /api/health/google` endpoint from §10.3 generalizes to **`GET /api/hea
 
 ### 8.5 Testing
 
-- All route tests use the `fake` providers (deterministic, zero network): `FakeTranslator` returns `f"[{target_lang}] {text}"`, `FakeTTS` returns a fixed tiny MP3, `FakeSTT` echoes a preset transcript.
-- Contract tests per provider live in `tests/test_providers_<vendor>.py`, marked with `@pytest.mark.network` and skipped by default; run them manually to verify real credentials.
+- All route tests should use the `fake` providers (deterministic, zero network): `FakeTranslator` returns `f"[{target_lang}] {text}"`, `FakeTTS` returns a fixed minimal MP3 frame, `FakeSTT` returns a preset transcript (configurable via constructor).
+- Contract tests per provider would live in `tests/test_providers_<vendor>.py`, marked with `@pytest.mark.network` and skipped by default.
+- **Note:** The `backend/tests/` directory does not yet exist. Tests are planned but not implemented.
 
 ### Key service contracts (Python) — pure services
 
@@ -611,14 +610,14 @@ MYGLOT_DEFAULT_TARGET_LANG=de-DE
 MYGLOT_DEFAULT_TTS_VOICE=           # empty = let server pick a default for target lang
 
 # Provider selection (see §8.3). Each capability is independent.
-MYGLOT_TRANSLATE_PROVIDER=google    # google | openai | fake
-MYGLOT_TTS_PROVIDER=google          # google | openai | fake
-MYGLOT_STT_PROVIDER=google          # google | openai | deepgram | fake
+MYGLOT_TRANSLATE_PROVIDER=google    # google | fake
+MYGLOT_TTS_PROVIDER=google          # google | fake
+MYGLOT_STT_PROVIDER=google          # google | fake
 
 # Vendor credentials — only set the ones your selected providers need.
 # GOOGLE_APPLICATION_CREDENTIALS is already set above for Google providers.
-OPENAI_API_KEY=
-DEEPGRAM_API_KEY=
+OPENAI_API_KEY=                      # (not yet implemented)
+DEEPGRAM_API_KEY=                    # (not yet implemented)
 
 # Optional — limits
 MYGLOT_MAX_SOURCE_CHARS=2000
@@ -648,14 +647,14 @@ Behaviour rules:
 - Changing `target_lang` or `tts_voice` **does not** retroactively regenerate audio for existing items. Each item keeps the `audio_voice` it was created with. If you want items to use the new voice, open them and click **Regenerate audio** — that's the only re-TTS trigger.
 - Changing `source_lang` only affects **new** items; existing items keep their original `source_lang`.
 - Settings changes are saved immediately on the server (no "unsaved changes" state) and are picked up on the very next API call — no restart needed.
-- There is also a **"Test Google connection"** button on the Settings page that calls `GET /api/health/google`, which does a tiny Translate call (`"hello"` → target) and a `ListVoices` call, and reports OK / the specific error. Useful for verifying your `.env` is wired up correctly.
+- There is also a **"Test Providers"** button on the Settings page that calls `GET /api/health/providers`, which checks that each configured provider (translator, TTS, STT) can be instantiated. Reports OK / error per capability with green/red status dots. Useful for verifying your `.env` is wired up correctly.
 
 ### 10.4 Changing credentials later
 
 If you rotate the service-account key or switch Google projects:
 1. Replace `secrets/gcp.json` (same path) **or** update `GOOGLE_APPLICATION_CREDENTIALS` in `.env` to a new path.
 2. Restart the server (Ctrl-C, re-run `uvicorn`).
-3. Click **Test Google connection** in Settings to confirm.
+3. Click **Test Providers** in Settings to confirm.
 
 Existing DB rows and audio files are unaffected.
 
@@ -678,8 +677,10 @@ Existing DB rows and audio files are unaffected.
 
 ## 12. Testing Strategy
 - **Unit:** similarity scoring, audio path handling, DTO validation.
-- **API:** FastAPI `TestClient` with Google services monkey-patched to return canned text/audio.
+- **API:** FastAPI `TestClient` with providers set to `fake` (no network).
 - **Manual smoke:** add item, edit, regenerate, play, record, download — a short checklist in `README.md`.
+
+> **Current status:** The `backend/tests/` directory does not yet exist. The `task test` command is configured to run `pytest -v` in the backend directory. Tests should use the `fake` providers (see §8.5).
 
 ---
 
@@ -723,17 +724,17 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install deps first (layer cache)
-COPY backend/pyproject.toml backend/requirements.txt* ./
+COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend code
 COPY backend/app ./app
 
-# Copy frontend into a path the backend will serve as static files
-COPY frontend /app/frontend
+# Copy frontend
+COPY frontend ./frontend
 
-# Data dir will be bind-mounted at runtime; create the mount point
-RUN mkdir -p /app/data /app/secrets
+# Create mount points
+RUN mkdir -p /app/data/audio /app/secrets
 
 EXPOSE 8000
 
@@ -747,8 +748,6 @@ Notes:
 ### 13.4 `docker-compose.yml`
 
 ```yaml
-version: "3.9"
-
 services:
   myglot:
     build:
@@ -827,7 +826,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-The `.env` at the project root is loaded by `python-dotenv`. Paths like `./secrets/gcp.json` and `./data` resolve relative to where you run `uvicorn` from (the project root), so run from there or use absolute paths.
+The `.env` at the project root is loaded by `python-dotenv`. `task dev` runs uvicorn from the `backend/` directory (set via Taskfile `dir` key), and the `.env` is loaded via the Taskfile `dotenv` directive which loads `../.env` (the project root). Paths like `./data` in `.env` resolve relative to the project root when running via Docker, but relative to `backend/` when using `task dev` — so `MYGLOT_DATA_DIR` is typically set as an absolute path or the default `./data` works because the config resolves it relative to the project root.
 
 ### 13.8 `.dockerignore`
 
@@ -839,6 +838,10 @@ __pycache__/
 *.pyc
 .git/
 .venv/
+venv/
+.idea/
+.vscode/
+*.md
 ```
 
 Keeps secrets, data, and caches out of the build context (faster builds, no credential leaks into image layers).
@@ -875,7 +878,8 @@ These details supplement the spec and were decided during implementation.
 Used `abc.ABC` with `@abstractmethod` (not `typing.Protocol`) for `Translator`, `TTS`, and `STT`. This gives clearer error messages when a subclass forgets to implement a method. The concrete classes are:
 - `providers/google/{translate,tts,stt}.py`
 - `providers/fake/{translate,tts,stt}.py` (for tests / offline dev)
-- `providers/registry.py` — factory functions `get_translator()`, `get_tts()`, `get_stt()` cached with `@lru_cache`.
+- `providers/registry.py` — factory functions `get_translator()`, `get_tts()`, `get_stt()` cached with `@lru_cache`. Uses if/elif dispatch (not a dict registry) to select providers by name.
+- `providers/base.py` — abstract interfaces + DTO models (Voice, TTSResult, STTResult, ProviderError, ProviderNotConfigured).
 
 ### 16.2 Google client singletons
 Each Google provider module uses a module-level `_client = None` with a `_get_client()` lazy initializer. This avoids re-creating the gRPC client on every request. The `@lru_cache` on the registry factory ensures one provider instance per process.
@@ -900,6 +904,9 @@ The Record button is a toggle: click once to start recording, click again to sto
 ### 16.8 `docker-compose.yml` — no `version` key
 Modern Docker Compose (v2+) no longer requires the `version` field. Omitted for simplicity.
 
+### 16.8b Route file organization
+Backup, restore, and backup-schedule endpoints all live in `routes/health.py` alongside the health checks. This keeps all "infrastructure" endpoints together. The items, categories, settings, and voices routes each have their own file.
+
 ### 16.9 Category deletion — manual SET NULL
 SQLite `ON DELETE SET NULL` may not fire through SQLModel's cascade config, so `DELETE /api/categories/{id}` manually nullifies `item.category_id` before deleting the category row.
 
@@ -915,15 +922,20 @@ Category filters on Home and Practice are `<select multiple>` elements. Selectio
 ### 16.13 Regenerate audio always visible
 The **Regenerate audio** action is always available from the **Edit** modal (not only when `audio_stale` is true). This allows re-generating audio after changing the TTS voice in Settings.
 
+### 16.13b New item sort order
+When a new item is created, its `sort_order` is set to `min(existing_sort_orders) - 1` so it appears at the top of the list. If no items exist, `sort_order` defaults to 0.
+
 ### 16.14 Database backup & restore
-- **Backup** (`GET /api/backup`): uses SQLite's Online Backup API to create a consistent, lock-free copy of the database, served as a timestamped `.db` file download.
-- **Restore** (`POST /api/restore`): accepts a `.db` file upload, validates it contains the expected tables (`item`, `settings`), creates a safety copy of the current DB (`myglot_pre_restore_<timestamp>.db` in `data/`), then swaps the file and reinitializes the engine. The page reloads after restore.
+- **Backup** (`GET /api/backup`): uses SQLite's Online Backup API to create a consistent, lock-free copy of the database, served as a timestamped `.db` file download (`myglot_backup_YYYYMMDD_HHMMSS.db`).
+- **Restore** (`POST /api/restore`): accepts a `.db` file upload, validates it contains the expected tables (`item`, `settings`), creates a safety copy of the current DB (`myglot_pre_restore_YYYYMMDD_HHMMSS.db` in the `data/` directory), disposes the SQLAlchemy engine, swaps the file, and reinitializes the engine + runs migrations. The frontend reloads after restore.
+- **Automatic backups** (`scheduler.py`): a background asyncio task runs every 60 seconds, reads the `BackupSchedule` row, checks `croniter` to see if a backup is due, and creates a timestamped snapshot using SQLite Online Backup API. Old backups beyond `max_backups` are automatically deleted. Uses the `croniter` library for cron expression parsing.
 
 ### 16.15 File layout (actual)
 ```
 myglot/
   SPEC.md
   README.md
+  Taskfile.yml
   .env.example
   .gitignore
   .dockerignore
@@ -945,9 +957,11 @@ myglot/
       models.py
       schemas.py
       errors.py
+      scheduler.py
       migrations/
         __init__.py
         001_add_sort_order.py
+        002_add_backup_schedule.py
       routes/
         __init__.py
         health.py
@@ -976,6 +990,8 @@ myglot/
   frontend/
     index.html
     styles.css
+    biome.json
+    package.json
     js/
       api.js
       util.js
@@ -984,6 +1000,11 @@ myglot/
       practice.js
       settings.js
       app.js
+  data/                     # gitignored; created at first run
+    myglot.db
+    audio/
+  secrets/                  # gitignored
+    gcp.json
 ```
 
 ---
