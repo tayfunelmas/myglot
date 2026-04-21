@@ -4,6 +4,10 @@ A personal, single-user web app for learning a target language by accumulating a
 
 > **Status:** Draft for review. Please edit inline or leave comments before implementation starts.
 
+> **Maintenance rules:**
+> - Any change to design, architecture, or code organization **must** update this SPEC file to stay in sync.
+> - Any change that affects how the user runs or interacts with the app **must** update the README file.
+
 ---
 
 ## 1. Goals & Non-Goals
@@ -167,6 +171,8 @@ A personal, single-user web app for learning a target language by accumulating a
 | `target_text`  | TEXT        | NOT NULL, translated/edited |
 | `audio_path`   | TEXT        | relative path under `data/audio/`, nullable if generation failed |
 | `audio_voice`  | TEXT        | voice name used (e.g. `de-DE-Wavenet-B`) |
+| `audio_provider`| TEXT       | which TTS provider produced the audio |
+| `sort_order`   | INTEGER     | display order (lower = higher in list), default 0 |
 | `audio_stale`  | BOOLEAN     | true if target_text changed after last TTS |
 | `created_at`   | DATETIME    | UTC |
 | `updated_at`   | DATETIME    | UTC |
@@ -180,7 +186,41 @@ A personal, single-user web app for learning a target language by accumulating a
 | `target_lang` | TEXT   | default `de` |
 | `tts_voice`   | TEXT   | default null → server picks default for `target_lang` |
 
-### 6.2 Filesystem layout
+### 6.2 Database Migrations
+
+The schema evolves over time without losing user data. Migrations live in `backend/app/migrations/` as numbered Python modules.
+
+#### How it works
+
+1. A `_migration` table in SQLite tracks which versions have been applied.
+2. On startup, `init_db()` calls `SQLModel.metadata.create_all()` (creates any new tables) and then `run_migrations()` which discovers all `backend/app/migrations/NNN_*.py` files, skips already-applied versions, and runs the rest in order.
+3. Each migration module exposes:
+   - `VERSION: int` — unique ascending integer matching the file prefix.
+   - `def up(conn: sqlite3.Connection) -> None` — applies the change.
+4. Migrations are idempotent where possible (e.g. check column existence before `ALTER TABLE`).
+
+#### Adding a new migration
+
+1. Create `backend/app/migrations/<next_number>_<description>.py`.
+2. Define `VERSION = <next_number>` and `def up(conn):`.
+3. Update `models.py` to match (SQLModel `create_all` handles new tables; migrations handle altering existing tables).
+4. Update the data model tables in this SPEC (§6.1) to reflect the new columns/tables.
+5. Test: delete `data/myglot.db`, restart — fresh DB gets the column via `create_all` and the migration is recorded. Or keep the old DB — the migration adds the column.
+
+#### Rules
+
+- Never modify or renumber an existing migration that has been released.
+- Migrations must not import application code (models, services) — use raw SQL only. This avoids breakage when models change in later versions.
+- Each migration runs inside its own transaction (committed after success).
+- The `_migration` table schema:
+
+| Column    | Type        | Notes |
+|-----------|-------------|-------|
+| `version` | INTEGER PK  | migration version number |
+| `name`    | TEXT        | module name (e.g. `001_add_sort_order`) |
+| `applied` | TEXT        | UTC timestamp of when it was applied |
+
+### 6.3 Filesystem layout
 ```
 data/
   myglot.db
@@ -190,12 +230,12 @@ data/
 
 Audio filename uses a UUID (not the item id) so regeneration can atomically write a new file, then update the DB, then delete the old file.
 
-### 6.3 Language codes
+### 6.4 Language codes
 - Translate API uses ISO-639-1 (e.g., `en`, `de`, `tr`).
 - TTS/STT use BCP-47 (e.g., `en-US`, `de-DE`, `tr-TR`).
 - Settings stores **both** fields per lang, or a small lookup table maps `en → en-US`. For simplicity, store the BCP-47 form and derive the 2-letter code for Translate by splitting on `-`.
 
-### 6.4 Similarity scoring
+### 6.5 Similarity scoring
 - Normalize both strings: lowercase, strip punctuation, collapse whitespace, Unicode NFC.
 - Compute two numbers:
   - **Char-level ratio:** `difflib.SequenceMatcher(None, a, b).ratio()` → handles minor typos/accents.
@@ -263,6 +303,7 @@ backend/
     main.py                 # FastAPI app + static mount for frontend
     config.py               # env + settings
     db.py                   # SQLModel engine, session
+    migrate.py              # versioned migration runner
     models.py               # Item, Settings, Category
     schemas.py              # Pydantic DTOs
     routes/
@@ -271,6 +312,9 @@ backend/
       settings.py
       voices.py
       health.py
+    migrations/             # numbered migration scripts (see §6.2)
+      __init__.py
+      001_add_sort_order.py
     providers/              # pluggable external services (see §8.1)
       __init__.py           # registry + factory
       base.py               # abstract interfaces + DTOs

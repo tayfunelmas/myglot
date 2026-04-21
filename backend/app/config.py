@@ -40,9 +40,7 @@ class Config:
         self.google_credentials = creds
         data_dir_raw = os.getenv("MYGLOT_DATA_DIR", "./data")
         self.data_dir = (
-            Path(data_dir_raw)
-            if os.path.isabs(data_dir_raw)
-            else _project_root / data_dir_raw
+            Path(data_dir_raw) if os.path.isabs(data_dir_raw) else _project_root / data_dir_raw
         )
         self.audio_dir = self.data_dir / "audio"
         self.host = os.getenv("MYGLOT_HOST", "127.0.0.1")

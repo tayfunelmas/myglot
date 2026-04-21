@@ -36,7 +36,7 @@ export const api = {
   listItems: (params = {}) => {
     const qs = new URLSearchParams();
     if (params.q) qs.set("q", params.q);
-    if (params.category_id) qs.set("category_id", params.category_id);
+    if (params.category_ids) qs.set("category_ids", params.category_ids);
     if (params.limit) qs.set("limit", params.limit);
     if (params.offset) qs.set("offset", params.offset);
     return request("GET", `/items?${qs}`);
@@ -46,6 +46,7 @@ export const api = {
   updateItem: (id, data) => request("PATCH", `/items/${id}`, data),
   deleteItem: (id) => request("DELETE", `/items/${id}`),
   regenerateAudio: (id) => request("POST", `/items/${id}/regenerate-audio`),
+  reorderItems: (itemIds) => request("POST", "/items/reorder", { item_ids: itemIds }),
 
   // Practice
   practice: async (id, audioBlob) => {

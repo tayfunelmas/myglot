@@ -22,8 +22,17 @@ def get_engine():
 
 def init_db() -> None:
     from . import models  # noqa: F401 — ensure models registered
+    from .migrate import run_migrations
 
-    SQLModel.metadata.create_all(get_engine())
+    engine = get_engine()
+    SQLModel.metadata.create_all(engine)
+
+    db_path = str(get_config().data_dir / "myglot.db")
+    applied = run_migrations(db_path)
+    if applied:
+        import logging
+
+        logging.getLogger(__name__).info("Applied migrations: %s", applied)
 
 
 def get_session():

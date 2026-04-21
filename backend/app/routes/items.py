@@ -24,6 +24,7 @@ from ..schemas import (
     ItemOut,
     ItemUpdate,
     PracticeResult,
+    ReorderRequest,
 )
 from ..services import audio_store, similarity
 
@@ -60,6 +61,7 @@ def _get_settings(session: Session) -> Settings:
 def list_items(
     q: str | None = None,
     category_id: int | None = None,
+    category_ids: str | None = None,
     limit: int = Query(default=100, le=500),
     offset: int = 0,
     session: Session = Depends(get_session),
@@ -67,7 +69,13 @@ def list_items(
     stmt = select(Item)
     count_stmt = select(func.count(Item.id))  # type: ignore[arg-type]
 
-    if category_id is not None:
+    # Support multi-category filter (comma-separated) or single category_id
+    if category_ids:
+        ids = [int(x) for x in category_ids.split(",") if x.strip().isdigit()]
+        if ids:
+            stmt = stmt.where(col(Item.category_id).in_(ids))
+            count_stmt = count_stmt.where(col(Item.category_id).in_(ids))
+    elif category_id is not None:
         stmt = stmt.where(Item.category_id == category_id)
         count_stmt = count_stmt.where(Item.category_id == category_id)
 
@@ -82,10 +90,22 @@ def list_items(
 
     total = session.exec(count_stmt).one()
     items = session.exec(
-        stmt.order_by(col(Item.created_at).desc()).offset(offset).limit(limit)
+        stmt.order_by(col(Item.sort_order).asc(), col(Item.created_at).desc())
+        .offset(offset)
+        .limit(limit)
     ).all()
 
     return ItemListOut(items=[_item_to_out(item) for item in items], total=total)
+
+
+@router.post("/items/reorder", status_code=204)
+def reorder_items(data: ReorderRequest, session: Session = Depends(get_session)):
+    for idx, item_id in enumerate(data.item_ids):
+        item = session.get(Item, item_id)
+        if item:
+            item.sort_order = idx
+            session.add(item)
+    session.commit()
 
 
 @router.post("/items", response_model=ItemOut, status_code=201)
@@ -136,12 +156,17 @@ def create_item(data: ItemCreate, session: Session = Depends(get_session)):
     except ProviderError:
         pass  # item created without audio; user can regenerate later
 
+    # Assign sort_order: new items go to the top (lowest value)
+    min_order = session.exec(select(func.min(Item.sort_order))).one()  # type: ignore[arg-type]
+    new_order = (min_order or 0) - 1
+
     item = Item(
         category_id=category_id,
         source_lang=settings.source_lang,
         target_lang=settings.target_lang,
         source_text=source_text,
         target_text=target_text,
+        sort_order=new_order,
         audio_path=audio_path,
         audio_voice=audio_voice,
         audio_provider=audio_provider,

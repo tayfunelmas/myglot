@@ -26,24 +26,32 @@ export async function loadCategories() {
     allCategories = [];
   }
 
-  // Populate all category dropdowns
-  const selectors = [
-    "category-select",
-    "home-category-filter",
-    "practice-category-filter",
-    "edit-category-select",
-  ];
-  for (const id of selectors) {
+  // Populate filter multi-selects
+  const filterIds = ["home-category-filter", "practice-category-filter"];
+  for (const id of filterIds) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    const saved = JSON.parse(localStorage.getItem(`myglot_${id}`) || "[]");
+    el.innerHTML = "";
+    for (const cat of allCategories) {
+      const opt = document.createElement("option");
+      opt.value = String(cat.id);
+      opt.textContent = `${cat.name} (${cat.item_count})`;
+      if (saved.includes(String(cat.id))) opt.selected = true;
+      el.appendChild(opt);
+    }
+  }
+
+  // Populate single-select dropdowns (add-item, edit modal)
+  const singleIds = ["category-select", "edit-category-select"];
+  for (const id of singleIds) {
     const el = document.getElementById(id);
     if (!el) continue;
     const current = el.value;
-    const isFilter = id.includes("filter");
     const isEdit = id === "edit-category-select";
-    el.innerHTML = isFilter
-      ? '<option value="">All categories</option>'
-      : isEdit
-        ? '<option value="0">No category</option>'
-        : '<option value="">No category</option>';
+    el.innerHTML = isEdit
+      ? '<option value="0">No category</option>'
+      : '<option value="">No category</option>';
     for (const cat of allCategories) {
       el.innerHTML += `<option value="${cat.id}">${escapeHtml(cat.name)} (${cat.item_count})</option>`;
     }
@@ -82,15 +90,37 @@ async function addItem() {
 
 export async function loadItems() {
   const q = document.getElementById("home-search")?.value || "";
-  const categoryId = document.getElementById("home-category-filter")?.value || "";
+  const filterEl = document.getElementById("home-category-filter");
+  const selectedIds = filterEl ? [...filterEl.selectedOptions].map((o) => o.value) : [];
+  // Persist selection
+  localStorage.setItem("myglot_home-category-filter", JSON.stringify(selectedIds));
 
   const container = document.getElementById("items-list");
   try {
-    const data = await api.listItems({ q, category_id: categoryId });
-    container.innerHTML =
-      data.items.length === 0
-        ? '<p style="color:#868e96; text-align:center;">No items yet. Add one above!</p>'
-        : data.items.map(renderHomeItem).join("");
+    const params = { q };
+    if (selectedIds.length > 0) params.category_ids = selectedIds.join(",");
+    const data = await api.listItems(params);
+    if (data.items.length === 0) {
+      container.innerHTML =
+        '<p style="color:#868e96; text-align:center;">No items yet. Add one above!</p>';
+    } else {
+      container.innerHTML = `
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th class="col-drag"></th>
+              <th class="col-source">Source</th>
+              <th class="col-target">Translation</th>
+              <th class="col-meta">Category</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="items-tbody">
+            ${data.items.map(renderHomeItem).join("")}
+          </tbody>
+        </table>`;
+      initDragAndDrop();
+    }
     attachHomeListeners();
   } catch (e) {
     container.innerHTML = `<p class="status error">${escapeHtml(e.message)}</p>`;
@@ -101,21 +131,88 @@ function renderHomeItem(item) {
   const catBadge = item.category
     ? `<span class="category-badge">${escapeHtml(item.category.name)}</span>`
     : "";
-  const staleBadge = item.audio_stale ? '<span class="stale-badge">audio outdated</span>' : "";
+  const staleBadge = item.audio_stale ? '<span class="stale-badge">stale</span>' : "";
   return `
-    <div class="item-card" data-id="${item.id}">
-        <div class="source">${escapeHtml(item.source_text)}</div>
-        <div class="target">${escapeHtml(item.target_text)}</div>
-        <div class="meta">${catBadge} ${staleBadge}</div>
-        <div class="actions">
-            ${item.audio_url ? `<button class="small btn-play" data-id="${item.id}">&#9654; Play</button>` : ""}
-            ${item.audio_url ? `<a href="${api.audioDownloadUrl(item.id)}" class="small" style="padding:4px 10px;font-size:12px;text-decoration:none;border:1px solid #dee2e6;border-radius:6px;">&#11015; Download</a>` : ""}
-            <button class="small btn-edit" data-id="${item.id}">Edit</button>
-            ${item.audio_stale ? `<button class="small btn-regen" data-id="${item.id}">Regenerate Audio</button>` : ""}
-            <button class="small danger btn-delete" data-id="${item.id}">Delete</button>
+    <tr class="item-row" draggable="true" data-id="${item.id}">
+      <td class="col-drag"><span class="drag-handle" title="Drag to reorder">&#9776;</span></td>
+      <td class="col-source">${escapeHtml(item.source_text)}</td>
+      <td class="col-target">${escapeHtml(item.target_text)} ${staleBadge}</td>
+      <td class="col-meta">${catBadge}</td>
+      <td class="col-actions">
+        <div class="row-actions">
+          ${item.audio_url ? `<button type="button" class="icon-btn btn-play" data-id="${item.id}" title="Play audio">&#9654;</button>` : ""}
+          <button type="button" class="icon-btn btn-edit" data-id="${item.id}" title="Edit">&#9998;</button>
+          <button type="button" class="icon-btn btn-regen" data-id="${item.id}" title="Regenerate audio">&#8635;</button>
+          <button type="button" class="icon-btn danger btn-delete" data-id="${item.id}" title="Delete">&#10005;</button>
         </div>
         <audio id="audio-${item.id}" preload="none"></audio>
-    </div>`;
+      </td>
+    </tr>`;
+}
+
+let _dragSrcRow = null;
+
+function initDragAndDrop() {
+  const tbody = document.getElementById("items-tbody");
+  if (!tbody) return;
+
+  tbody.addEventListener("dragstart", (e) => {
+    const row = e.target.closest("tr.item-row");
+    if (!row) return;
+    _dragSrcRow = row;
+    row.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", row.dataset.id);
+  });
+
+  tbody.addEventListener("dragend", (e) => {
+    const row = e.target.closest("tr.item-row");
+    if (row) {
+      row.classList.remove("dragging");
+    }
+    _dragSrcRow = null;
+    tbody.querySelectorAll("tr.item-row").forEach((r) => {
+      r.classList.remove("drag-over");
+    });
+  });
+
+  tbody.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const targetRow = e.target.closest("tr.item-row");
+    if (!targetRow || targetRow === _dragSrcRow) return;
+    tbody.querySelectorAll("tr.item-row").forEach((r) => {
+      r.classList.remove("drag-over");
+    });
+    targetRow.classList.add("drag-over");
+  });
+
+  tbody.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    const targetRow = e.target.closest("tr.item-row");
+    if (!targetRow || !_dragSrcRow || targetRow === _dragSrcRow) return;
+
+    // Move DOM row
+    const rows = [...tbody.querySelectorAll("tr.item-row")];
+    const srcIdx = rows.indexOf(_dragSrcRow);
+    const tgtIdx = rows.indexOf(targetRow);
+    if (srcIdx < tgtIdx) {
+      targetRow.after(_dragSrcRow);
+    } else {
+      targetRow.before(_dragSrcRow);
+    }
+
+    // Persist new order
+    const newOrder = [...tbody.querySelectorAll("tr.item-row")].map((r) =>
+      parseInt(r.dataset.id, 10),
+    );
+    try {
+      await api.reorderItems(newOrder);
+    } catch (err) {
+      console.error("Reorder failed:", err);
+      await loadItems(); // reload on failure
+    }
+  });
 }
 
 function attachHomeListeners() {

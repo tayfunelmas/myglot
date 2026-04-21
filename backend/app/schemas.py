@@ -78,6 +78,10 @@ class PracticeResult(BaseModel):
     diff: list[dict]
 
 
+class ReorderRequest(BaseModel):
+    item_ids: list[int]
+
+
 # --- Health ---
 class ProviderStatus(BaseModel):
     provider: str

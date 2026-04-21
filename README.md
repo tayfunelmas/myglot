@@ -62,6 +62,7 @@ backend/          Python FastAPI backend
     routes/       API endpoints
     providers/    Pluggable Translate/TTS/STT providers
     services/     Pure business logic
+    migrations/   Versioned DB migration scripts
 frontend/         Static HTML + JS + CSS
 data/             SQLite DB + audio files (gitignored)
 secrets/          Google credentials (gitignored)
