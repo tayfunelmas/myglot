@@ -42,6 +42,20 @@ export const api = {
     return request("GET", `/items?${qs}`);
   },
   createItem: (data) => request("POST", "/items", data),
+  translate: (sourceText) => request("POST", "/translate", { source_text: sourceText }),
+  ttsPreview: async (text) => {
+    const resp = await fetch(`${BASE}/tts/preview`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!resp.ok) {
+      const data = await resp.json();
+      const msg = data?.error?.message || data?.detail?.[0]?.msg || JSON.stringify(data);
+      throw new Error(msg);
+    }
+    return resp.blob();
+  },
   getItem: (id) => request("GET", `/items/${id}`),
   updateItem: (id, data) => request("PATCH", `/items/${id}`, data),
   deleteItem: (id) => request("DELETE", `/items/${id}`),

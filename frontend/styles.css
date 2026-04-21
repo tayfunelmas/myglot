@@ -156,6 +156,19 @@ button.small {
   font-size: 12px;
 }
 
+.add-buttons {
+  flex-wrap: wrap;
+}
+
+#audio-preview {
+  margin-top: 8px;
+}
+
+#audio-preview audio {
+  width: 100%;
+  max-width: 400px;
+}
+
 /* Status messages */
 .status {
   margin-top: 8px;

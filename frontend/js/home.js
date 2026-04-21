@@ -7,7 +7,9 @@ export async function initHome() {
   await loadCategories();
   await loadItems();
 
-  document.getElementById("btn-translate").addEventListener("click", addItem);
+  document.getElementById("btn-translate").addEventListener("click", translateSource);
+  document.getElementById("btn-gen-audio").addEventListener("click", previewAudio);
+  document.getElementById("btn-add-item").addEventListener("click", addItem);
   document.getElementById("home-search").addEventListener(
     "input",
     debounce(() => loadItems()),
@@ -59,17 +61,62 @@ export async function loadCategories() {
   }
 }
 
-async function addItem() {
+async function translateSource() {
   const sourceText = document.getElementById("source-text").value.trim();
   if (!sourceText) return;
 
   const status = document.getElementById("add-status");
-  setStatus(status, "Translating and generating audio...", "loading");
+  setStatus(status, "Translating...", "loading");
+
+  try {
+    const result = await api.translate(sourceText);
+    document.getElementById("target-text").value = result.target_text;
+    setStatus(status, "Translation ready — edit if needed.", "success");
+  } catch (e) {
+    setStatus(status, e.message, "error");
+  }
+}
+
+async function previewAudio() {
+  const targetText = document.getElementById("target-text").value.trim();
+  if (!targetText) {
+    const status = document.getElementById("add-status");
+    setStatus(status, "Enter or generate a translation first.", "error");
+    return;
+  }
+
+  const status = document.getElementById("add-status");
+  setStatus(status, "Generating audio preview...", "loading");
+
+  try {
+    const blob = await api.ttsPreview(targetText);
+    const url = URL.createObjectURL(blob);
+    const preview = document.getElementById("audio-preview");
+    preview.innerHTML = "";
+    const audio = document.createElement("audio");
+    audio.controls = true;
+    audio.src = url;
+    preview.appendChild(audio);
+    audio.play();
+    setStatus(status, "Audio preview ready.", "success");
+  } catch (e) {
+    setStatus(status, e.message, "error");
+  }
+}
+
+async function addItem() {
+  const sourceText = document.getElementById("source-text").value.trim();
+  const targetText = document.getElementById("target-text").value.trim();
+  if (!sourceText) return;
+
+  const status = document.getElementById("add-status");
+  setStatus(status, "Adding item...", "loading");
 
   const categorySelect = document.getElementById("category-select");
   const newCategoryInput = document.getElementById("new-category");
 
   const payload = { source_text: sourceText };
+  if (targetText) payload.target_text = targetText;
   if (newCategoryInput.value.trim()) {
     payload.category_name = newCategoryInput.value.trim();
   } else if (categorySelect.value) {
@@ -79,6 +126,8 @@ async function addItem() {
   try {
     await api.createItem(payload);
     document.getElementById("source-text").value = "";
+    document.getElementById("target-text").value = "";
+    document.getElementById("audio-preview").innerHTML = "";
     newCategoryInput.value = "";
     setStatus(status, "Item added!", "success");
     await loadCategories();

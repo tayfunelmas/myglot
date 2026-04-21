@@ -46,16 +46,14 @@ A personal, single-user web app for learning a target language by accumulating a
 3. Optionally picks a **TTS voice** for the target language (dropdown populated from Google TTS).
 4. Saves. Settings are persisted.
 
-### 2.2 Add a new item
+### 2.2 Add a new item (3-step workflow)
 1. User types source text into an input on the Home page.
 2. Optionally selects a **category** from a dropdown (or types a new one to create it inline).
-3. Clicks **Translate & Generate Audio**.
-4. Backend:
-   - Calls Google Translate (`source → target`).
-   - Calls Google TTS on the translated text → saves MP3 to filesystem.
-   - If a new category name was provided, creates the `category` row first.
-   - Inserts DB row with `source_text`, `target_text`, `audio_path`, `category_id`, timestamps, languages, voice.
-5. UI shows the new item at the top of the list.
+3. Clicks **Translate** → backend calls Translate API, result fills an editable translation textarea. *Alternatively*, the user can type the translation directly and skip this step entirely.
+4. User may edit the translation text freely.
+5. Clicks **Generate Audio** → backend runs TTS on the (edited) translation, returns an audio preview that plays inline. Only enabled when translation text is present.
+6. Clicks **Add Item** → backend creates the DB row. If `target_text` is provided in the request, translation is skipped server-side. TTS runs server-side to store the MP3 on disk.
+7. UI clears the form and shows the new item at the top of the list.
 
 ### 2.3 Edit translation & regenerate audio
 1. In an item's detail/edit view, user edits `target_text`.
@@ -103,8 +101,8 @@ A personal, single-user web app for learning a target language by accumulating a
 |----|-------------|
 | F1 | CRUD for items: create, list, get, update (target text and category; source is immutable after create to keep history simple), delete. |
 | F1b | CRUD for categories: create, list, rename, delete (soft — items become uncategorized). |
-| F2 | Translate endpoint: given source text + lang pair → target text (no persistence; used internally on create). |
-| F3 | TTS endpoint: given text + lang + voice → MP3 file stored on disk, path saved on item. |
+| F2 | Standalone translate endpoint (`POST /api/translate`): given source text → target text (no persistence). Used by the UI before adding an item, or skipped if the user types the translation manually. |
+| F3 | TTS preview endpoint (`POST /api/tts/preview`): given text → returns audio bytes for inline playback. Stored audio is generated separately when the item is created. |
 | F4 | STT endpoint: accepts uploaded audio blob + expected target lang → returns transcript. |
 | F5 | Similarity scoring: server computes normalized similarity between transcript and stored target text (see §6.4). |
 | F6 | Settings: persist source lang, target lang, voice. |
@@ -278,7 +276,9 @@ Base path: `/api`. All JSON unless noted.
 | POST   | `/api/items/reorder`         | `{item_ids:[int]}`                                          | `{status:"ok"}` |
 | GET    | `/api/backup`                | —                                                           | `application/x-sqlite3` (attachment) |
 | POST   | `/api/restore`               | multipart: `file` (.db)                                     | `{status:"ok", message:"..."}` |
-| POST   | `/api/items`                 | `{source_text, category_id?}` (uses current settings for langs/voice) | `Item` (with `target_text`, `audio_url`) |
+| POST   | `/api/translate`             | `{source_text}`                                             | `{target_text}` |
+| POST   | `/api/tts/preview`           | `{text}`                                                    | `audio/mpeg` (inline binary) |
+| POST   | `/api/items`                 | `{source_text, target_text?, category_id?}` — if `target_text` provided, translation is skipped | `Item` (with `target_text`, `audio_url`) |
 | GET    | `/api/items/{id}`            | —                                                           | `Item` |
 | PATCH  | `/api/items/{id}`            | `{target_text?, category_id?}`                              | `Item` (sets `audio_stale=true` if `target_text` changed) |
 | POST   | `/api/items/{id}/regenerate-audio` | —                                                     | `Item` (fresh `audio_url`, `audio_stale=false`) |

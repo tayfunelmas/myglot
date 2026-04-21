@@ -25,12 +25,20 @@
                     <textarea id="source-text" placeholder="Type a word, phrase, or sentence in your source language..." rows="2"></textarea>
                 </div>
                 <div class="form-row">
+                    <textarea id="target-text" placeholder="Translation will appear here (or type your own)..." rows="2"></textarea>
+                </div>
+                <div class="form-row">
                     <select id="category-select">
                         <option value="">No category</option>
                     </select>
                     <input id="new-category" type="text" placeholder="Or type new category name...">
                 </div>
-                <button type="button" id="btn-translate" class="primary">Translate &amp; Generate Audio</button>
+                <div class="form-row add-buttons">
+                    <button type="button" id="btn-translate">Translate</button>
+                    <button type="button" id="btn-gen-audio">Generate Audio</button>
+                    <button type="button" id="btn-add-item" class="primary">Add Item</button>
+                </div>
+                <div id="audio-preview"></div>
                 <div id="add-status" class="status"></div>
             </div>
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlmodel import Session, col, func, select
 
 from ..config import get_config
@@ -25,6 +25,9 @@ from ..schemas import (
     ItemUpdate,
     PracticeResult,
     ReorderRequest,
+    TranslateRequest,
+    TranslateResponse,
+    TtsPreviewRequest,
 )
 from ..services import audio_store, similarity
 
@@ -98,6 +101,37 @@ def list_items(
     return ItemListOut(items=[_item_to_out(item) for item in items], total=total)
 
 
+@router.post("/translate", response_model=TranslateResponse)
+def translate_text(data: TranslateRequest, session: Session = Depends(get_session)):
+    source_text = data.source_text.strip()
+    if not source_text:
+        raise ValidationError("source_text cannot be empty")
+    settings = _get_settings(session)
+    try:
+        translator = get_translator()
+        target_text = translator.translate(
+            source_text, settings.source_lang, settings.target_lang
+        )
+    except ProviderError as e:
+        raise ProviderAPIError("translator", str(e)) from e
+    return TranslateResponse(target_text=target_text)
+
+
+@router.post("/tts/preview")
+def tts_preview(data: TtsPreviewRequest, session: Session = Depends(get_session)):
+    text = data.text.strip()
+    if not text:
+        raise ValidationError("text cannot be empty")
+    settings = _get_settings(session)
+    try:
+        tts = get_tts()
+        voice_id = settings.tts_voice or None
+        result = tts.synthesize(text, settings.target_lang, voice_id)
+    except ProviderError as e:
+        raise ProviderAPIError("tts", str(e)) from e
+    return Response(content=result.audio_bytes, media_type=result.mime)
+
+
 @router.post("/items/reorder", status_code=204)
 def reorder_items(data: ReorderRequest, session: Session = Depends(get_session)):
     for idx, item_id in enumerate(data.item_ids):
@@ -135,12 +169,19 @@ def create_item(data: ItemCreate, session: Session = Depends(get_session)):
                 session.refresh(cat)
                 category_id = cat.id
 
-    # Translate
-    try:
-        translator = get_translator()
-        target_text = translator.translate(source_text, settings.source_lang, settings.target_lang)
-    except ProviderError as e:
-        raise ProviderAPIError("translator", str(e)) from e
+    # Translate (skip if target_text already provided)
+    if data.target_text:
+        target_text = data.target_text.strip()
+        if not target_text:
+            raise ValidationError("target_text cannot be empty")
+    else:
+        try:
+            translator = get_translator()
+            target_text = translator.translate(
+                source_text, settings.source_lang, settings.target_lang
+            )
+        except ProviderError as e:
+            raise ProviderAPIError("translator", str(e)) from e
 
     # TTS
     audio_path = None

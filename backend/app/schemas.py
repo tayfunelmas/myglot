@@ -26,9 +26,23 @@ class CategoryRef(BaseModel):
     name: str
 
 
+# --- Translate ---
+class TranslateRequest(BaseModel):
+    source_text: str
+
+
+class TranslateResponse(BaseModel):
+    target_text: str
+
+
+class TtsPreviewRequest(BaseModel):
+    text: str
+
+
 # --- Items ---
 class ItemCreate(BaseModel):
     source_text: str
+    target_text: str | None = None  # if provided, skip translation
     category_id: int | None = None
     category_name: str | None = None  # create-inline: provide name to auto-create
 

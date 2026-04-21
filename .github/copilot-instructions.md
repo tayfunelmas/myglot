@@ -11,8 +11,8 @@ Before making any changes or answering questions about this project, **always re
 
 ## Key Rules
 
-- Any change to design, architecture, or code organization **must** update `SPEC.md`.
-- Any change that affects how the user runs or interacts with the app **must** update `README.md`.
+- Any change (or findings you discover) to design, architecture, or code organization **must** update `SPEC.md`.
+- Any change (or findings you discover) that affects how the user runs or interacts with the app **must** update `README.md`.
 - Database schema changes **must** use the versioned migration system in `backend/app/migrations/` (see SPEC §6.2). Never modify an existing released migration.
 - All code must pass `task check` (ruff format + ruff lint + mypy + Biome) before being considered complete.
 
