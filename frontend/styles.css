@@ -311,6 +311,12 @@ header {
   min-width: 0;
 }
 
+/* Stretch text fields to fill their form-row */
+.form-row > .text-field {
+  flex: 1;
+  min-width: 0;
+}
+
 .field-hint {
   display: block;
   margin-top: 4px;
@@ -383,6 +389,12 @@ header {
   pointer-events: none;
 }
 
+/* Stretch select fields to fill their form-row */
+.form-row > .select-field {
+  flex: 1;
+  min-width: 0;
+}
+
 select[multiple] {
   min-height: 38px;
   max-height: 120px;
@@ -399,6 +411,26 @@ select[multiple] {
 select[multiple]:focus {
   border-color: var(--md-sys-color-primary);
   outline: none;
+}
+
+/* Bigger, wider category filter selects in list header and practice */
+.filters select[multiple] {
+  min-width: 200px;
+  min-height: 48px;
+  font: var(--md-sys-typescale-body-large);
+  padding: 10px 12px;
+}
+
+#home .filters select[multiple],
+#home .filters .text-field {
+  width: 100%;
+  min-width: 0;
+}
+
+#practice .filters select[multiple],
+#home .filters select[multiple] {
+  width: 100%;
+  min-width: 0;
 }
 
 /* Checkbox field */
@@ -587,12 +619,7 @@ button.small.danger:hover {
    LIST HEADER & FILTERS
    ============================================================ */
 .list-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   margin-bottom: 12px;
-  flex-wrap: wrap;
-  gap: 12px;
 }
 
 .list-header h2 {
