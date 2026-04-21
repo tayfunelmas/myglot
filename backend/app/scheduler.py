@@ -68,7 +68,11 @@ async def _scheduler_loop() -> None:
 
                 # Determine if a backup is due
                 now = datetime.now(UTC)
-                cron = croniter(schedule.cron_expr, schedule.last_run_at or now)
+                # last_run_at is stored as a naive datetime in SQLite; treat it as UTC
+                last_run = schedule.last_run_at
+                if last_run is not None and last_run.tzinfo is None:
+                    last_run = last_run.replace(tzinfo=UTC)
+                cron = croniter(schedule.cron_expr, last_run or now)
                 next_run = cron.get_next(datetime)
 
                 # If last_run_at is None we haven't run yet — trigger immediately
