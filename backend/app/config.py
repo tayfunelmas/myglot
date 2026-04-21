@@ -33,8 +33,17 @@ class Config:
     max_audio_upload_bytes: int
 
     def __init__(self) -> None:
-        self.google_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        self.data_dir = Path(os.getenv("MYGLOT_DATA_DIR", "./data"))
+        creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        if creds and not os.path.isabs(creds):
+            creds = str((_project_root / creds).resolve())
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds
+        self.google_credentials = creds
+        data_dir_raw = os.getenv("MYGLOT_DATA_DIR", "./data")
+        self.data_dir = (
+            Path(data_dir_raw)
+            if os.path.isabs(data_dir_raw)
+            else _project_root / data_dir_raw
+        )
         self.audio_dir = self.data_dir / "audio"
         self.host = os.getenv("MYGLOT_HOST", "127.0.0.1")
         self.port = int(os.getenv("MYGLOT_PORT", "8000"))
