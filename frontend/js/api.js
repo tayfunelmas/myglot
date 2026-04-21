@@ -80,4 +80,7 @@ export const api = {
   // Audio URL helper (not an API call)
   audioUrl: (id) => `${BASE}/items/${id}/audio`,
   audioDownloadUrl: (id) => `${BASE}/items/${id}/audio?download=1`,
+
+  // CSV export URL (direct browser download)
+  exportCsvUrl: () => `${BASE}/items/export`,
 };

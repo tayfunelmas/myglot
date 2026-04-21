@@ -20,6 +20,9 @@ export async function initSettings() {
   document.getElementById("btn-load-voices").addEventListener("click", loadVoices);
   document.getElementById("btn-test-providers").addEventListener("click", testProviders);
 
+  // CSV export
+  document.getElementById("btn-export-csv").href = api.exportCsvUrl();
+
   // Categories management
   document.getElementById("btn-add-cat").addEventListener("click", addCategory);
   await loadCategoriesList();

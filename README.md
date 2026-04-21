@@ -29,6 +29,7 @@ task up
 - Category filters on both Home and Practice tabs are sticky (saved to `localStorage`).
 - **Backup/Restore** is in Settings → Database Backup & Restore.
 - **Automatic backups** can be configured in Settings with a cron expression.
+- **Export to CSV** is in Settings → Export Data. Downloads all items (source text, translation, category) sorted by category and order — ready for Excel or Google Sheets.
 - **Provider selection** is per-capability (translate, TTS, STT). Currently `google` and `fake` are implemented. Set via `.env` (see SPEC §8.3).
 
 ## Development (without Docker)

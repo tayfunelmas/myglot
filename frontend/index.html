@@ -187,6 +187,21 @@
 
             <div class="card">
                 <h3 class="card-subtitle">
+                    <span class="material-symbols-rounded">table_view</span>
+                    Export Data
+                </h3>
+                <p class="card-description">Download all items as a CSV file, sorted by category and order. Includes source text, translation, and category columns — ready to open in Excel or Google Sheets.</p>
+                <div class="form-row">
+                    <a id="btn-export-csv" href="#" class="btn btn-tonal" download="myglot_export.csv">
+                        <span class="material-symbols-rounded">download</span>
+                        Download CSV
+                    </a>
+                </div>
+                <div id="export-status" class="status"></div>
+            </div>
+
+            <div class="card">
+                <h3 class="card-subtitle">
                     <span class="material-symbols-rounded">backup</span>
                     Database Backup &amp; Restore
                 </h3>

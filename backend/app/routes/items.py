@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import csv
+import io
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
-from fastapi.responses import FileResponse, Response
-from sqlmodel import Session, col, func, select
+from fastapi.responses import FileResponse, Response, StreamingResponse
+from sqlmodel import Session, col, func, nullslast, select
 
 from ..config import get_config
 from ..db import get_session
@@ -60,6 +62,40 @@ def _get_settings(session: Session) -> Settings:
     from ..routes.settings import _ensure_settings
 
     return _ensure_settings(session)
+
+
+@router.get("/items/export")
+def export_items_csv(session: Session = Depends(get_session)) -> StreamingResponse:
+    """Return all items as a CSV file sorted by category name then sort_order."""
+    stmt = (
+        select(Item)
+        .outerjoin(Category, Item.category_id == Category.id)  # type: ignore[arg-type]
+        .order_by(
+            nullslast(col(Category.name).asc()),
+            col(Item.sort_order).asc(),
+            col(Item.created_at).desc(),
+        )
+    )
+    items = session.exec(stmt).all()
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["source_text", "target_text", "category"])
+    for item in items:
+        writer.writerow(
+            [
+                item.source_text,
+                item.target_text,
+                item.category.name if item.category else "",
+            ]
+        )
+
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="myglot_export.csv"'},
+    )
 
 
 @router.get("/items", response_model=ItemListOut)

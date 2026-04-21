@@ -96,6 +96,12 @@ A personal, single-user web app for learning a target language by accumulating a
 4. A background task runs every 60 seconds, checks whether a backup is due, and creates a timestamped SQLite snapshot. Old backups beyond the max are automatically deleted.
 5. The last run time and status are displayed in the UI.
 
+### 2.6c Export items as CSV
+1. User opens **Settings** and scrolls to **Export Data**.
+2. Clicks **Download CSV** — the browser downloads `myglot_export.csv` via `GET /api/items/export`.
+3. The CSV contains three columns: `source_text`, `target_text`, `category`, sorted by category name (uncategorized items appear last) and then by each item's `sort_order`.
+4. The file can be opened directly in Excel or Google Sheets.
+
 ### 2.7 Manage categories
 - User can create, rename, and delete categories from the **Home** page or a dedicated section.
 - Deleting a category does **not** delete its items — they become uncategorized (`category_id = NULL`).
@@ -128,6 +134,7 @@ A personal, single-user web app for learning a target language by accumulating a
 | F12 | Database backup: `GET /api/backup` downloads a consistent SQLite snapshot. |
 | F13 | Database restore: `POST /api/restore` accepts a `.db` file upload, validates it, and replaces the current database. |
 | F14 | Automatic backup schedule: configurable via `GET/PUT /api/backup-schedule`. Background task checks cron expression every 60s and creates a consistent SQLite snapshot in the configured destination, rotating old backups. |
+| F15 | CSV export: `GET /api/items/export` streams all items as a UTF-8 CSV (columns: `source_text`, `target_text`, `category`), sorted by category name then `sort_order`. Download button in Settings. |
 
 ## 4. Non-Functional Requirements
 - **Simplicity:** minimal dependencies; easy to run with one command.
@@ -300,6 +307,7 @@ Base path: `/api`. All JSON unless noted.
 | POST   | `/api/categories`            | `{name}`                                                    | `201` + `Category` |
 | PATCH  | `/api/categories/{id}`       | `{name}`                                                    | `Category` |
 | DELETE | `/api/categories/{id}`       | —                                                           | `204` (items become uncategorized) |
+| GET    | `/api/items/export`          | —                                                           | `text/csv` (attachment: `myglot_export.csv`) sorted by category name, then `sort_order` |
 | GET    | `/api/items?q=&category_id=&category_ids=&limit=&offset=` | `category_ids`: comma-separated IDs for multi-filter | `{items:[Item], total}` |
 | POST   | `/api/items/reorder`         | `{item_ids:[int]}`                                          | `204` (no body) |
 | GET    | `/api/backup`                | —                                                           | `application/x-sqlite3` (attachment) |
