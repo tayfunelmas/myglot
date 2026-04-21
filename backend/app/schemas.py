@@ -123,5 +123,22 @@ class ErrorDetail(BaseModel):
     message: str
 
 
+# --- Backup Schedule ---
+class BackupScheduleOut(BaseModel):
+    enabled: bool
+    cron_expr: str
+    destination_dir: str
+    max_backups: int
+    last_run_at: datetime | None = None
+    last_status: str
+
+
+class BackupScheduleUpdate(BaseModel):
+    enabled: bool | None = None
+    cron_expr: str | None = None
+    destination_dir: str | None = None
+    max_backups: int | None = None
+
+
 class ErrorResponse(BaseModel):
     error: ErrorDetail

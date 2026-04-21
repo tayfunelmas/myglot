@@ -73,6 +73,10 @@ export const api = {
   // Health
   healthProviders: () => request("GET", "/health/providers"),
 
+  // Backup schedule
+  getBackupSchedule: () => request("GET", "/backup-schedule"),
+  updateBackupSchedule: (data) => request("PUT", "/backup-schedule", data),
+
   // Audio URL helper (not an API call)
   audioUrl: (id) => `${BASE}/items/${id}/audio`,
   audioDownloadUrl: (id) => `${BASE}/items/${id}/audio?download=1`,

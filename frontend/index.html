@@ -114,6 +114,28 @@
                 </div>
                 <div id="restore-status" class="status"></div>
             </div>
+
+            <hr>
+            <h3>Automatic Backups</h3>
+            <div class="settings-form">
+                <p style="color:#495057;font-size:14px;margin-bottom:12px;">Schedule automatic database backups using a cron expression.</p>
+                <label>
+                    <input type="checkbox" id="autobackup-enabled"> Enable automatic backups
+                </label>
+                <label>Cron Expression
+                    <input id="autobackup-cron" type="text" placeholder="0 2 * * *">
+                    <small style="color:#868e96;">e.g. <code>0 2 * * *</code> = daily at 2 AM, <code>0 */6 * * *</code> = every 6 hours</small>
+                </label>
+                <label>Destination Directory (absolute path, empty = default)
+                    <input id="autobackup-dest" type="text" placeholder="/path/to/backups">
+                </label>
+                <label>Max Backups to Keep
+                    <input id="autobackup-max" type="number" min="1" value="7">
+                </label>
+                <button type="button" id="btn-save-autobackup" class="primary">Save Schedule</button>
+                <div id="autobackup-status" class="status"></div>
+                <div id="autobackup-last" style="color:#495057;font-size:13px;margin-top:8px;"></div>
+            </div>
         </section>
     </main>
 

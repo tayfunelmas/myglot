@@ -35,3 +35,13 @@ class Settings(SQLModel, table=True):
     source_lang: str = "en-US"
     target_lang: str = "de-DE"
     tts_voice: str = ""
+
+
+class BackupSchedule(SQLModel, table=True):
+    id: int = Field(default=1, primary_key=True)
+    enabled: bool = False
+    cron_expr: str = "0 2 * * *"  # default: daily at 2 AM
+    destination_dir: str = ""  # empty = <data_dir>/backups
+    max_backups: int = 7  # rotate: keep last N backups
+    last_run_at: Optional[datetime] = None
+    last_status: str = ""

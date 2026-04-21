@@ -89,6 +89,13 @@ A personal, single-user web app for learning a target language by accumulating a
 2. **Download Backup** — downloads a consistent `.db` snapshot of the entire database via `GET /api/backup`.
 3. **Restore from Backup** — user selects a `.db` file and clicks **Restore from Backup**. The server validates the file, creates a safety copy of the current DB, then swaps it in. The page reloads automatically.
 
+### 2.6b Configure automatic backups
+1. User opens **Settings** and scrolls to **Automatic Backups**.
+2. Enables the checkbox, enters a **cron expression** (e.g. `0 2 * * *` for daily at 2 AM), an optional **destination directory** (absolute path; empty uses `<data_dir>/backups`), and the **max backups** to retain.
+3. Clicks **Save Schedule**. The backend validates the cron expression and persists the config.
+4. A background task runs every 60 seconds, checks whether a backup is due, and creates a timestamped SQLite snapshot. Old backups beyond the max are automatically deleted.
+5. The last run time and status are displayed in the UI.
+
 ### 2.7 Manage categories
 - User can create, rename, and delete categories from the **Home** page or a dedicated section.
 - Deleting a category does **not** delete its items — they become uncategorized (`category_id = NULL`).
@@ -120,6 +127,7 @@ A personal, single-user web app for learning a target language by accumulating a
 | F11 | Multi-category filter: `GET /api/items` accepts `category_ids` (comma-separated) for filtering by multiple categories. |
 | F12 | Database backup: `GET /api/backup` downloads a consistent SQLite snapshot. |
 | F13 | Database restore: `POST /api/restore` accepts a `.db` file upload, validates it, and replaces the current database. |
+| F14 | Automatic backup schedule: configurable via `GET/PUT /api/backup-schedule`. Background task checks cron expression every 60s and creates a consistent SQLite snapshot in the configured destination, rotating old backups. |
 
 ## 4. Non-Functional Requirements
 - **Simplicity:** minimal dependencies; easy to run with one command.
@@ -206,6 +214,18 @@ A personal, single-user web app for learning a target language by accumulating a
 | `target_lang` | TEXT   | default `de` |
 | `tts_voice`   | TEXT   | default null → server picks default for `target_lang` |
 
+**Table: `backupschedule`** (single row, `id=1`)
+
+| Column           | Type        | Notes |
+|------------------|-------------|-------|
+| `id`             | INT PK      | always 1 |
+| `enabled`        | BOOLEAN     | default false |
+| `cron_expr`      | TEXT        | cron expression, default `0 2 * * *` (daily 2 AM) |
+| `destination_dir`| TEXT        | absolute path; empty = `<data_dir>/backups` |
+| `max_backups`    | INTEGER     | rotate: keep last N backups, default 7 |
+| `last_run_at`    | DATETIME    | UTC, nullable |
+| `last_status`    | TEXT        | `ok: <filename>` or `error: <message>` |
+
 ### 6.2 Database Migrations
 
 The schema evolves over time without losing user data. Migrations live in `backend/app/migrations/` as numbered Python modules.
@@ -283,6 +303,8 @@ Base path: `/api`. All JSON unless noted.
 | POST   | `/api/items/reorder`         | `{item_ids:[int]}`                                          | `{status:"ok"}` |
 | GET    | `/api/backup`                | —                                                           | `application/x-sqlite3` (attachment) |
 | POST   | `/api/restore`               | multipart: `file` (.db)                                     | `{status:"ok", message:"..."}` |
+| GET    | `/api/backup-schedule`       | —                                                           | `BackupSchedule` |
+| PUT    | `/api/backup-schedule`       | `{enabled?, cron_expr?, destination_dir?, max_backups?}`    | `BackupSchedule` |
 | POST   | `/api/translate`             | `{source_text}`                                             | `{target_text}` |
 | POST   | `/api/translate-back`        | `{target_text}`                                             | `{source_text}` — reverse translation (target→source) |
 | POST   | `/api/tts/preview`           | `{text}`                                                    | `audio/mpeg` (inline binary) |
@@ -341,6 +363,7 @@ backend/
     migrations/             # numbered migration scripts (see §6.2)
       __init__.py
       001_add_sort_order.py
+      002_add_backup_schedule.py
     providers/              # pluggable external services (see §8.1)
       __init__.py           # registry + factory
       base.py               # abstract interfaces + DTOs

@@ -27,6 +27,10 @@ export async function initSettings() {
   // Backup & Restore
   document.getElementById("btn-backup-db").addEventListener("click", backupDatabase);
   document.getElementById("btn-restore-db").addEventListener("click", restoreDatabase);
+
+  // Auto-backup schedule
+  document.getElementById("btn-save-autobackup").addEventListener("click", saveAutoBackup);
+  await loadAutoBackupSchedule();
 }
 
 async function saveSettings() {
@@ -198,6 +202,49 @@ async function restoreDatabase() {
     setStatus(status, "Database restored! Reloading page...", "success");
     fileInput.value = "";
     setTimeout(() => window.location.reload(), 1000);
+  } catch (e) {
+    setStatus(status, e.message, "error");
+  }
+}
+
+async function loadAutoBackupSchedule() {
+  try {
+    const s = await api.getBackupSchedule();
+    document.getElementById("autobackup-enabled").checked = s.enabled;
+    document.getElementById("autobackup-cron").value = s.cron_expr;
+    document.getElementById("autobackup-dest").value = s.destination_dir;
+    document.getElementById("autobackup-max").value = s.max_backups;
+
+    const lastEl = document.getElementById("autobackup-last");
+    if (s.last_run_at) {
+      const when = new Date(s.last_run_at).toLocaleString();
+      lastEl.textContent = `Last run: ${when} — ${s.last_status}`;
+    } else {
+      lastEl.textContent = "No automatic backup has run yet.";
+    }
+  } catch {
+    // schedule row may not exist yet — ignore
+  }
+}
+
+async function saveAutoBackup() {
+  const status = document.getElementById("autobackup-status");
+  const data = {
+    enabled: document.getElementById("autobackup-enabled").checked,
+    cron_expr: document.getElementById("autobackup-cron").value.trim(),
+    destination_dir: document.getElementById("autobackup-dest").value.trim(),
+    max_backups: parseInt(document.getElementById("autobackup-max").value, 10) || 7,
+  };
+
+  if (data.enabled && !data.cron_expr) {
+    setStatus(status, "Cron expression cannot be empty when enabled.", "error");
+    return;
+  }
+
+  try {
+    await api.updateBackupSchedule(data);
+    setStatus(status, "Auto-backup schedule saved!", "success");
+    await loadAutoBackupSchedule();
   } catch (e) {
     setStatus(status, e.message, "error");
   }

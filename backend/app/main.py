@@ -28,7 +28,7 @@ def startup():
     from sqlmodel import Session
 
     from .db import get_engine
-    from .models import Settings
+    from .models import BackupSchedule, Settings
 
     with Session(get_engine()) as session:
         if session.get(Settings, 1) is None:
@@ -41,6 +41,14 @@ def startup():
                 )
             )
             session.commit()
+        if session.get(BackupSchedule, 1) is None:
+            session.add(BackupSchedule(id=1))
+            session.commit()
+
+    # Start background auto-backup scheduler
+    from .scheduler import start_scheduler
+
+    start_scheduler()
 
 
 # Serve frontend static files — must be AFTER API routes

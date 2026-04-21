@@ -4,15 +4,18 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile
+from croniter import croniter
+from fastapi import APIRouter, Depends, UploadFile
 from fastapi.responses import FileResponse
+from sqlmodel import Session
 
 from ..config import get_config
-from ..db import reset_engine
+from ..db import get_session, reset_engine
 from ..errors import ValidationError
+from ..models import BackupSchedule
 from ..providers.base import ProviderError
 from ..providers.registry import get_stt, get_translator, get_tts
-from ..schemas import HealthProviders, ProviderStatus
+from ..schemas import BackupScheduleOut, BackupScheduleUpdate, HealthProviders, ProviderStatus
 
 router = APIRouter(tags=["health"])
 
@@ -148,3 +151,49 @@ async def restore_database(file: UploadFile):
         tmp = Path(tmp_path)
         if tmp.exists():
             tmp.unlink()
+
+
+def _ensure_backup_schedule(session: Session) -> BackupSchedule:
+    schedule = session.get(BackupSchedule, 1)
+    if schedule is None:
+        schedule = BackupSchedule(id=1)
+        session.add(schedule)
+        session.commit()
+        session.refresh(schedule)
+    return schedule
+
+
+@router.get("/backup-schedule", response_model=BackupScheduleOut)
+def get_backup_schedule(session: Session = Depends(get_session)):
+    return _ensure_backup_schedule(session)
+
+
+@router.put("/backup-schedule", response_model=BackupScheduleOut)
+def update_backup_schedule(data: BackupScheduleUpdate, session: Session = Depends(get_session)):
+    schedule = _ensure_backup_schedule(session)
+
+    if data.cron_expr is not None:
+        if not croniter.is_valid(data.cron_expr):
+            raise ValidationError(f"Invalid cron expression: {data.cron_expr}")
+        schedule.cron_expr = data.cron_expr
+
+    if data.destination_dir is not None:
+        dest = data.destination_dir.strip()
+        if dest:
+            dest_path = Path(dest)
+            if not dest_path.is_absolute():
+                raise ValidationError("destination_dir must be an absolute path")
+        schedule.destination_dir = dest
+
+    if data.enabled is not None:
+        schedule.enabled = data.enabled
+
+    if data.max_backups is not None:
+        if data.max_backups < 1:
+            raise ValidationError("max_backups must be at least 1")
+        schedule.max_backups = data.max_backups
+
+    session.add(schedule)
+    session.commit()
+    session.refresh(schedule)
+    return schedule
