@@ -8,6 +8,7 @@ export async function initHome() {
   await loadItems();
 
   document.getElementById("btn-translate").addEventListener("click", translateSource);
+  document.getElementById("btn-translate-back").addEventListener("click", translateBack);
   document.getElementById("btn-gen-audio").addEventListener("click", previewAudio);
   document.getElementById("btn-add-item").addEventListener("click", addItem);
   document.getElementById("home-search").addEventListener(
@@ -73,6 +74,22 @@ async function translateSource() {
     const result = await api.translate(sourceText);
     document.getElementById("target-text").value = result.target_text;
     setStatus(status, "Translation ready — edit if needed.", "success");
+  } catch (e) {
+    setStatus(status, e.message, "error");
+  }
+}
+
+async function translateBack() {
+  const targetText = document.getElementById("target-text").value.trim();
+  if (!targetText) return;
+
+  const status = document.getElementById("add-status");
+  setStatus(status, "Translating back...", "loading");
+
+  try {
+    const result = await api.translateBack(targetText);
+    document.getElementById("source-text").value = result.source_text;
+    setStatus(status, "Reverse translation ready — edit if needed.", "success");
   } catch (e) {
     setStatus(status, e.message, "error");
   }

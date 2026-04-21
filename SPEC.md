@@ -55,6 +55,12 @@ A personal, single-user web app for learning a target language by accumulating a
 6. Clicks **Add Item** → backend creates the DB row. If `target_text` is provided in the request, translation is skipped server-side. TTS runs server-side to store the MP3 on disk.
 7. UI clears the form and shows the new item at the top of the list.
 
+### 2.2b Add a new item — reverse flow ("Translate back")
+1. User types a **target-language** sentence they heard into the translation textarea on the Home page.
+2. Clicks **Translate back** → backend translates from target lang to source lang; the result fills the source text field.
+3. User reviews the back-translation to confirm understanding.
+4. From here, the normal add-item flow continues: user can edit either field, generate audio, and click **Add Item**.
+
 ### 2.3 Edit translation & regenerate audio
 1. In an item's detail/edit view, user edits `target_text`.
 2. Saves → DB row updated, `audio_stale = true`.
@@ -102,6 +108,7 @@ A personal, single-user web app for learning a target language by accumulating a
 | F1 | CRUD for items: create, list, get, update (target text and category; source is immutable after create to keep history simple), delete. |
 | F1b | CRUD for categories: create, list, rename, delete (soft — items become uncategorized). |
 | F2 | Standalone translate endpoint (`POST /api/translate`): given source text → target text (no persistence). Used by the UI before adding an item, or skipped if the user types the translation manually. |
+| F2b | Reverse translate endpoint (`POST /api/translate-back`): given target text → source text (no persistence). Used when the user hears a target-language sentence and wants to confirm its meaning before adding. |
 | F3 | TTS preview endpoint (`POST /api/tts/preview`): given text → returns audio bytes for inline playback. Stored audio is generated separately when the item is created. |
 | F4 | STT endpoint: accepts uploaded audio blob + expected target lang → returns transcript. |
 | F5 | Similarity scoring: server computes normalized similarity between transcript and stored target text (see §6.4). |
@@ -277,6 +284,7 @@ Base path: `/api`. All JSON unless noted.
 | GET    | `/api/backup`                | —                                                           | `application/x-sqlite3` (attachment) |
 | POST   | `/api/restore`               | multipart: `file` (.db)                                     | `{status:"ok", message:"..."}` |
 | POST   | `/api/translate`             | `{source_text}`                                             | `{target_text}` |
+| POST   | `/api/translate-back`        | `{target_text}`                                             | `{source_text}` — reverse translation (target→source) |
 | POST   | `/api/tts/preview`           | `{text}`                                                    | `audio/mpeg` (inline binary) |
 | POST   | `/api/items`                 | `{source_text, target_text?, category_id?}` — if `target_text` provided, translation is skipped | `Item` (with `target_text`, `audio_url`) |
 | GET    | `/api/items/{id}`            | —                                                           | `Item` |

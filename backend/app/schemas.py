@@ -35,6 +35,14 @@ class TranslateResponse(BaseModel):
     target_text: str
 
 
+class TranslateBackRequest(BaseModel):
+    target_text: str
+
+
+class TranslateBackResponse(BaseModel):
+    source_text: str
+
+
 class TtsPreviewRequest(BaseModel):
     text: str
 

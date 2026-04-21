@@ -25,6 +25,8 @@ from ..schemas import (
     ItemUpdate,
     PracticeResult,
     ReorderRequest,
+    TranslateBackRequest,
+    TranslateBackResponse,
     TranslateRequest,
     TranslateResponse,
     TtsPreviewRequest,
@@ -113,6 +115,20 @@ def translate_text(data: TranslateRequest, session: Session = Depends(get_sessio
     except ProviderError as e:
         raise ProviderAPIError("translator", str(e)) from e
     return TranslateResponse(target_text=target_text)
+
+
+@router.post("/translate-back", response_model=TranslateBackResponse)
+def translate_back(data: TranslateBackRequest, session: Session = Depends(get_session)):
+    target_text = data.target_text.strip()
+    if not target_text:
+        raise ValidationError("target_text cannot be empty")
+    settings = _get_settings(session)
+    try:
+        translator = get_translator()
+        source_text = translator.translate(target_text, settings.target_lang, settings.source_lang)
+    except ProviderError as e:
+        raise ProviderAPIError("translator", str(e)) from e
+    return TranslateBackResponse(source_text=source_text)
 
 
 @router.post("/tts/preview")

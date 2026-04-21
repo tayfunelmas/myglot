@@ -43,6 +43,7 @@ export const api = {
   },
   createItem: (data) => request("POST", "/items", data),
   translate: (sourceText) => request("POST", "/translate", { source_text: sourceText }),
+  translateBack: (targetText) => request("POST", "/translate-back", { target_text: targetText }),
   ttsPreview: async (text) => {
     const resp = await fetch(`${BASE}/tts/preview`, {
       method: "POST",
