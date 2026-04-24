@@ -94,6 +94,13 @@ tasks:
     cmds:
       - docker compose up -d --build
 
+  reload:
+    desc: Stop, rebuild, and start fresh
+    cmds:
+      - docker compose down
+      - docker compose build
+      - docker compose up -d
+
   # ---------- Local dev ----------
   dev:
     desc: Run backend locally for development (auto-reload)

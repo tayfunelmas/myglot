@@ -57,6 +57,7 @@ This project uses [Task](https://taskfile.dev/) as a task runner. Run `task --li
 | `task up` | Start application via docker compose (detached) |
 | `task down` | Stop application |
 | `task restart` | Rebuild and restart |
+| `task reload` | Stop, rebuild, and start fresh |
 | `task logs` | Tail application logs |
 | `task lint` | Run all lint and type checks (backend + frontend) |
 | `task lint:backend` | Ruff linter + mypy type checker |
