@@ -16,6 +16,13 @@ def _build_translator(cfg: Config) -> Translator:
         from .fake.translate import FakeTranslator
 
         return FakeTranslator()
+    elif name == "ollama":
+        from .ollama.translate import OllamaTranslator
+
+        return OllamaTranslator(
+            base_url=cfg.ollama_base_url,
+            model=cfg.ollama_model,
+        )
     else:
         raise ProviderNotConfigured(f"Unknown translate provider: {name}")
 

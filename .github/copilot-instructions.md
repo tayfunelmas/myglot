@@ -51,6 +51,7 @@ backend/app/          FastAPI application
     registry.py       Factory functions (@lru_cache), if/elif dispatch
     google/           Google Cloud implementations
     fake/             Stubs for offline dev/testing
+    ollama/           Local Ollama LLM translation
   services/           Pure business logic
     similarity.py     Scoring + word diff
     audio_store.py    File paths, save, delete

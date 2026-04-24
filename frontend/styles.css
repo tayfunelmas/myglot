@@ -1082,3 +1082,104 @@ button.small.danger:hover {
     font-size: 13px;
   }
 }
+
+/* --- Translation Explanation Area --- */
+.explanation-area {
+  margin-top: 16px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 12px;
+  background: var(--md-sys-color-surface-container-low);
+  overflow: hidden;
+}
+
+.explanation-area.hidden {
+  display: none;
+}
+
+.explanation-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+.explanation-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.explanation-header .icon-btn {
+  margin-left: auto;
+}
+
+.explanation-content {
+  padding: 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--md-sys-color-on-surface);
+  overflow-x: auto;
+}
+
+.explanation-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+}
+
+.explanation-content th,
+.explanation-content td {
+  text-align: left;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.explanation-content th {
+  font-weight: 600;
+  background: var(--md-sys-color-surface-container);
+}
+
+.explanation-content ul,
+.explanation-content ol {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+.explanation-content li {
+  margin: 4px 0;
+}
+
+.explanation-content code {
+  background: var(--md-sys-color-surface-container);
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.explanation-content strong {
+  color: var(--md-sys-color-primary);
+}
+
+/* --- Inline Explanation Rows (items table) --- */
+.explanation-row.hidden {
+  display: none;
+}
+
+.items-table .explanation-row td {
+  padding: 0;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.inline-explanation {
+  background: var(--md-sys-color-surface-container-low);
+  border-top: 1px dashed var(--md-sys-color-outline-variant);
+  padding: 12px 16px;
+  font-size: 13px;
+}
+
+.btn-explanation span {
+  color: var(--md-sys-color-tertiary);
+}

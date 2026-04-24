@@ -205,6 +205,7 @@ A personal, single-user web app for learning a target language by accumulating a
 | `target_lang`  | TEXT        | BCP-47, e.g. `de` |
 | `source_text`  | TEXT        | NOT NULL, user input |
 | `target_text`  | TEXT        | NOT NULL, translated/edited |
+| `explanation`  | TEXT        | Markdown explanation/breakdown of the translation (nullable, set by providers like Ollama) |
 | `audio_path`   | TEXT        | relative path under `data/audio/`, nullable if generation failed |
 | `audio_voice`  | TEXT        | voice name used (e.g. `de-DE-Wavenet-B`) |
 | `audio_provider`| TEXT       | which TTS provider produced the audio |
@@ -314,10 +315,10 @@ Base path: `/api`. All JSON unless noted.
 | POST   | `/api/restore`               | multipart: `file` (.db)                                     | `{status:"ok", message:"..."}` |
 | GET    | `/api/backup-schedule`       | —                                                           | `BackupSchedule` |
 | PUT    | `/api/backup-schedule`       | `{enabled?, cron_expr?, destination_dir?, max_backups?}`    | `BackupSchedule` |
-| POST   | `/api/translate`             | `{source_text}`                                             | `{target_text}` |
-| POST   | `/api/translate-back`        | `{target_text}`                                             | `{source_text}` — reverse translation (target→source) |
+| POST   | `/api/translate`             | `{source_text}`                                             | `{target_text, explanation?}` — `explanation` is Markdown (present when provider supports it, e.g. Ollama) |
+| POST   | `/api/translate-back`        | `{target_text}`                                             | `{source_text, explanation?}` — reverse translation (target→source) |
 | POST   | `/api/tts/preview`           | `{text}`                                                    | `audio/mpeg` (inline binary) |
-| POST   | `/api/items`                 | `{source_text, target_text?, category_id?, category_name?}` — if `target_text` provided, translation is skipped | `201` + `Item` (with `target_text`, `audio_url`) |
+| POST   | `/api/items`                 | `{source_text, target_text?, explanation?, category_id?, category_name?}` — if `target_text` provided, translation is skipped | `201` + `Item` (with `target_text`, `audio_url`) |
 | GET    | `/api/items/{id}`            | —                                                           | `Item` |
 | PATCH  | `/api/items/{id}`            | `{target_text?, category_id?}`                              | `Item` (sets `audio_stale=true` if `target_text` changed) |
 | POST   | `/api/items/{id}/regenerate-audio` | —                                                     | `Item` (fresh `audio_url`, `audio_stale=false`) |
@@ -334,6 +335,7 @@ Base path: `/api`. All JSON unless noted.
   "target_lang": "de-DE",
   "source_text": "Good morning",
   "target_text": "Guten Morgen",
+  "explanation": "| German | English | Notes |\n|---|---|---|\n| Guten | Good | ... |",
   "audio_url": "/api/items/42/audio",
   "audio_voice": "de-DE-Wavenet-B",
   "audio_provider": "google",
@@ -376,6 +378,7 @@ backend/
       __init__.py
       001_add_sort_order.py
       002_add_backup_schedule.py
+      003_add_item_explanation.py
     providers/              # pluggable external services (see §8.1)
       __init__.py
       base.py               # abstract interfaces (ABC) + DTOs
@@ -408,7 +411,11 @@ from abc import ABC, abstractmethod
 class Translator(ABC):
     name: str
     @abstractmethod
-    def translate(self, text: str, source_lang: str, target_lang: str) -> str: ...
+    def translate(self, text: str, source_lang: str, target_lang: str) -> TranslateResult: ...
+
+class TranslateResult(BaseModel):
+    text: str
+    explanation: str | None = None   # Markdown explanation (e.g. word-by-word breakdown)
 
 class Voice(BaseModel):
     id: str                 # provider-specific voice id, opaque to the app
@@ -448,6 +455,7 @@ Rules for implementations:
 - They must raise `ProviderError` (with a human message) on failure; never leak vendor-specific exception types to routes. Routes catch `ProviderError` and convert to `ProviderAPIError` (HTTP 503, code `PROVIDER_API_ERROR`).
 - They must normalize language codes: accept BCP-47 (`de-DE`) and internally convert to whatever the vendor wants (e.g. Google Translate v2 uses `de`, Deepgram would use `de-DE`).
 - **Google Translate:** uses the **v2** API (`google.cloud.translate_v2.Client`), not v3. The `google-cloud-translate` pip package includes both; v2 was chosen for simplicity.
+- **Ollama:** calls a local Ollama server (`/api/generate`) with a structured prompt that requests both a translation and a word-by-word explanation. The prompt is defined in `providers/ollama/translate.py` in the `_build_prompt()` function — edit that function to customise the translation/explanation prompt. The response is parsed via `_parse_response()` which extracts the translation (between `---TRANSLATION_START---` / `---TRANSLATION_END---` markers) and the explanation (between `---EXPLANATION_START---` / `---EXPLANATION_END---` markers).
 - Voice IDs are treated as **opaque strings** by the app. `Voice.id` from one provider is not expected to work with another. When the user switches providers, the voice dropdown repopulates and the stored `tts_voice` is cleared if it's no longer valid.
 - The filesystem audio layer (`audio_store`) is provider-agnostic; it just persists the `audio_bytes` returned by any TTS provider (extension inferred from `mime`).
 
@@ -476,6 +484,8 @@ def get_stt() -> STT: ...                 # @lru_cache
 ```
 
 > **Note:** OpenAI and Deepgram providers are not yet implemented. The registry uses if/elif dispatch rather than a dict. Adding a new provider means adding a new branch in the `_build_*` functions and the corresponding module under `app/providers/<vendor>/`.
+>
+> Currently implemented translate providers: `google`, `fake`, `ollama`.
 
 FastAPI wires these as cached dependencies:
 ```python
@@ -491,13 +501,16 @@ Swapping a provider = change env var + restart. Adding a new provider = add a ne
 Extend `.env` (see §10.2) with **per-capability** selectors so you can mix vendors (e.g., Google TTS + fake STT for offline dev):
 
 ```dotenv
-# Currently implemented: google | fake
+# Currently implemented: google | fake | ollama
 MYGLOT_TRANSLATE_PROVIDER=google
 MYGLOT_TTS_PROVIDER=google
 MYGLOT_STT_PROVIDER=google
 
 # Vendor credentials — only set the ones your selected providers need.
 GOOGLE_APPLICATION_CREDENTIALS=./secrets/gcp.json
+# Ollama settings (only needed when MYGLOT_TRANSLATE_PROVIDER=ollama):
+MYGLOT_OLLAMA_BASE_URL=http://localhost:11434
+MYGLOT_OLLAMA_MODEL=translategemma:latest
 # Planned (not yet implemented):
 # OPENAI_API_KEY=
 # DEEPGRAM_API_KEY=
@@ -1012,6 +1025,9 @@ myglot/
           translate.py
           tts.py
           stt.py
+        ollama/
+          __init__.py
+          translate.py
       services/
         __init__.py
         audio_store.py

@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
 </head>
 <body>
     <header>
@@ -83,6 +84,16 @@
                     </button>
                 </div>
                 <div id="audio-preview"></div>
+                <div id="translation-explanation" class="explanation-area hidden">
+                    <div class="explanation-header">
+                        <span class="material-symbols-rounded">school</span>
+                        <h3>Translation Breakdown</h3>
+                        <button type="button" class="icon-btn btn-close-explanation" title="Close">
+                            <span class="material-symbols-rounded">close</span>
+                        </button>
+                    </div>
+                    <div id="explanation-content" class="explanation-content"></div>
+                </div>
                 <div id="add-status" class="status"></div>
             </div>
 
@@ -265,6 +276,7 @@
                 Edit Item
             </h3>
             <input type="hidden" id="edit-item-id">
+            <input type="hidden" id="edit-source-text">
             <div class="text-field">
                 <textarea id="edit-target-text" rows="3" placeholder=" "></textarea>
                 <label for="edit-target-text">Target Text</label>
@@ -277,6 +289,10 @@
             </div>
             <div class="modal-actions">
                 <button type="button" id="btn-edit-cancel" class="btn btn-text">Cancel</button>
+                <button type="button" id="btn-edit-retranslate" class="btn btn-tonal">
+                    <span class="material-symbols-rounded">translate</span>
+                    Re-translate
+                </button>
                 <button type="button" id="btn-edit-regen" class="btn btn-tonal">
                     <span class="material-symbols-rounded">refresh</span>
                     Regenerate audio

@@ -20,6 +20,11 @@ class TTSResult(BaseModel):
     voice_id: str
 
 
+class TranslateResult(BaseModel):
+    text: str
+    explanation: str | None = None
+
+
 class STTResult(BaseModel):
     transcript: str
     confidence: float | None = None
@@ -37,7 +42,7 @@ class Translator(ABC):
     name: str
 
     @abstractmethod
-    def translate(self, text: str, source_lang: str, target_lang: str) -> str: ...
+    def translate(self, text: str, source_lang: str, target_lang: str) -> TranslateResult: ...
 
 
 class TTS(ABC):

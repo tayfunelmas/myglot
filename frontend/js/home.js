@@ -2,6 +2,7 @@ import { api } from "./api.js";
 import { debounce, escapeHtml, setStatus } from "./util.js";
 
 let allCategories = [];
+let _currentExplanation = null;
 
 export async function initHome() {
   await loadCategories();
@@ -16,10 +17,16 @@ export async function initHome() {
     debounce(() => loadItems()),
   );
   document.getElementById("home-category-filter").addEventListener("change", () => loadItems());
+  document
+    .querySelector(".btn-close-explanation")
+    ?.addEventListener("click", () => hideExplanation());
 
   // Edit modal
   document.getElementById("btn-edit-save").addEventListener("click", saveEdit);
   document.getElementById("btn-edit-regen").addEventListener("click", regenerateFromEditModal);
+  document
+    .getElementById("btn-edit-retranslate")
+    .addEventListener("click", retranslateFromEditModal);
   document.getElementById("btn-edit-cancel").addEventListener("click", closeEditModal);
 }
 
@@ -73,6 +80,8 @@ async function translateSource() {
   try {
     const result = await api.translate(sourceText);
     document.getElementById("target-text").value = result.target_text;
+    _currentExplanation = result.explanation || null;
+    showExplanation(result.explanation);
     setStatus(status, "Translation ready — edit if needed.", "success");
   } catch (e) {
     setStatus(status, e.message, "error");
@@ -89,10 +98,32 @@ async function translateBack() {
   try {
     const result = await api.translateBack(targetText);
     document.getElementById("source-text").value = result.source_text;
+    _currentExplanation = result.explanation || null;
+    showExplanation(result.explanation);
     setStatus(status, "Reverse translation ready — edit if needed.", "success");
   } catch (e) {
     setStatus(status, e.message, "error");
   }
+}
+
+function showExplanation(markdown) {
+  const container = document.getElementById("translation-explanation");
+  const content = document.getElementById("explanation-content");
+  if (!markdown) {
+    container.classList.add("hidden");
+    content.innerHTML = "";
+    return;
+  }
+  // marked is loaded globally from CDN
+  content.innerHTML = marked.parse(markdown);
+  container.classList.remove("hidden");
+}
+
+function hideExplanation() {
+  const container = document.getElementById("translation-explanation");
+  const content = document.getElementById("explanation-content");
+  container.classList.add("hidden");
+  content.innerHTML = "";
 }
 
 async function previewAudio() {
@@ -135,6 +166,7 @@ async function addItem() {
 
   const payload = { source_text: sourceText };
   if (targetText) payload.target_text = targetText;
+  if (_currentExplanation) payload.explanation = _currentExplanation;
   if (newCategoryInput.value.trim()) {
     payload.category_name = newCategoryInput.value.trim();
   } else if (categorySelect.value) {
@@ -147,6 +179,8 @@ async function addItem() {
     document.getElementById("target-text").value = "";
     document.getElementById("audio-preview").innerHTML = "";
     newCategoryInput.value = "";
+    _currentExplanation = null;
+    hideExplanation();
     setStatus(status, "Item added!", "success");
     await loadCategories();
     await loadItems();
@@ -199,6 +233,12 @@ function renderHomeItem(item) {
     ? `<span class="category-badge">${escapeHtml(item.category.name)}</span>`
     : "";
   const staleBadge = item.audio_stale ? '<span class="stale-badge">stale</span>' : "";
+  const explanationBtn = item.explanation
+    ? `<button type="button" class="icon-btn btn-explanation" data-id="${item.id}" title="Show explanation"><span class="material-symbols-rounded">school</span></button>`
+    : "";
+  const explanationRow = item.explanation
+    ? `<tr class="explanation-row hidden" id="explanation-row-${item.id}"><td colspan="5"><div class="inline-explanation explanation-content">${renderMarkdown(item.explanation)}</div></td></tr>`
+    : "";
   return `
     <tr class="item-row" draggable="true" data-id="${item.id}">
       <td class="col-drag"><span class="drag-handle material-symbols-rounded" title="Drag to reorder">drag_indicator</span></td>
@@ -207,13 +247,21 @@ function renderHomeItem(item) {
       <td class="col-meta">${catBadge}</td>
       <td class="col-actions">
         <div class="row-actions">
+          ${explanationBtn}
           ${item.audio_url ? `<button type="button" class="icon-btn btn-play" data-id="${item.id}" title="Play audio"><span class="material-symbols-rounded">play_arrow</span></button>` : ""}
           <button type="button" class="icon-btn btn-edit" data-id="${item.id}" title="Edit"><span class="material-symbols-rounded">edit</span></button>
           <button type="button" class="icon-btn danger btn-delete" data-id="${item.id}" title="Delete"><span class="material-symbols-rounded">delete</span></button>
         </div>
         <audio id="audio-${item.id}" preload="none"></audio>
       </td>
-    </tr>`;
+    </tr>${explanationRow}`;
+}
+
+function renderMarkdown(md) {
+  if (typeof marked !== "undefined" && marked.parse) {
+    return marked.parse(md);
+  }
+  return escapeHtml(md).replace(/\n/g, "<br>");
 }
 
 let _dragSrcRow = null;
@@ -282,6 +330,16 @@ function initDragAndDrop() {
 }
 
 function attachHomeListeners() {
+  document.querySelectorAll("#items-list .btn-explanation").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      const row = document.getElementById(`explanation-row-${id}`);
+      if (row) {
+        row.classList.toggle("hidden");
+      }
+    });
+  });
+
   document.querySelectorAll("#items-list .btn-play").forEach((btn) => {
     btn.addEventListener("click", () => {
       const id = btn.dataset.id;
@@ -312,6 +370,7 @@ function attachHomeListeners() {
 async function openEditModal(id) {
   const item = await api.getItem(id);
   document.getElementById("edit-item-id").value = item.id;
+  document.getElementById("edit-source-text").value = item.source_text;
   document.getElementById("edit-target-text").value = item.target_text;
   document.getElementById("edit-category-select").value = item.category?.id || "0";
   document.getElementById("edit-modal").classList.remove("hidden");
@@ -374,6 +433,46 @@ async function regenerateFromEditModal() {
   } finally {
     btnRegen.textContent = prevLabel;
     btnRegen.disabled = false;
+    btnSave.disabled = false;
+  }
+}
+
+async function retranslateFromEditModal() {
+  const id = parseInt(document.getElementById("edit-item-id").value, 10);
+  const sourceText = document.getElementById("edit-source-text").value.trim();
+  const categoryId = parseInt(document.getElementById("edit-category-select").value, 10);
+  const status = document.getElementById("edit-status");
+  const btn = document.getElementById("btn-edit-retranslate");
+  const btnSave = document.getElementById("btn-edit-save");
+
+  if (!sourceText) {
+    setStatus(status, "Source text is empty — cannot re-translate.", "error");
+    return;
+  }
+
+  const prevHTML = btn.innerHTML;
+  btn.textContent = "Translating...";
+  btn.disabled = true;
+  btnSave.disabled = true;
+  setStatus(status, "Re-translating...", "loading");
+
+  try {
+    const result = await api.translate(sourceText);
+    document.getElementById("edit-target-text").value = result.target_text;
+    // Save the new translation + explanation
+    await api.updateItem(id, {
+      target_text: result.target_text,
+      explanation: result.explanation || "",
+      category_id: categoryId,
+    });
+    setStatus(status, "Re-translated and saved.", "success");
+    await loadCategories();
+    await loadItems();
+  } catch (e) {
+    setStatus(status, e.message, "error");
+  } finally {
+    btn.innerHTML = prevHTML;
+    btn.disabled = false;
     btnSave.disabled = false;
   }
 }

@@ -33,6 +33,7 @@ class TranslateRequest(BaseModel):
 
 class TranslateResponse(BaseModel):
     target_text: str
+    explanation: str | None = None
 
 
 class TranslateBackRequest(BaseModel):
@@ -41,6 +42,7 @@ class TranslateBackRequest(BaseModel):
 
 class TranslateBackResponse(BaseModel):
     source_text: str
+    explanation: str | None = None
 
 
 class TtsPreviewRequest(BaseModel):
@@ -51,12 +53,14 @@ class TtsPreviewRequest(BaseModel):
 class ItemCreate(BaseModel):
     source_text: str
     target_text: str | None = None  # if provided, skip translation
+    explanation: str | None = None
     category_id: int | None = None
     category_name: str | None = None  # create-inline: provide name to auto-create
 
 
 class ItemUpdate(BaseModel):
     target_text: str | None = None
+    explanation: str | None = None
     category_id: int | None = None
 
 
@@ -66,6 +70,7 @@ class ItemOut(BaseModel):
     target_lang: str
     source_text: str
     target_text: str
+    explanation: str | None = None
     audio_url: str | None = None
     audio_voice: str | None = None
     audio_provider: str | None = None

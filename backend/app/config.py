@@ -29,6 +29,8 @@ class Config:
     stt_provider: str
     openai_api_key: str
     deepgram_api_key: str
+    ollama_base_url: str
+    ollama_model: str
     max_source_chars: int
     max_audio_upload_bytes: int
 
@@ -53,6 +55,8 @@ class Config:
         self.stt_provider = os.getenv("MYGLOT_STT_PROVIDER", "google")
         self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
         self.deepgram_api_key = os.getenv("DEEPGRAM_API_KEY", "")
+        self.ollama_base_url = os.getenv("MYGLOT_OLLAMA_BASE_URL", "http://localhost:11434")
+        self.ollama_model = os.getenv("MYGLOT_OLLAMA_MODEL", "translategemma:latest")
         self.max_source_chars = int(os.getenv("MYGLOT_MAX_SOURCE_CHARS", "2000"))
         max_mb = int(os.getenv("MYGLOT_MAX_AUDIO_UPLOAD_MB", "10"))
         self.max_audio_upload_bytes = max_mb * 1024 * 1024

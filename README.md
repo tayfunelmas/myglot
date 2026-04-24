@@ -30,7 +30,8 @@ task up
 - **Backup/Restore** is in Settings → Database Backup & Restore.
 - **Automatic backups** can be configured in Settings with a cron expression.
 - **Export to CSV** is in Settings → Export Data. Downloads all items (source text, translation, category) sorted by category and order — ready for Excel or Google Sheets.
-- **Provider selection** is per-capability (translate, TTS, STT). Currently `google` and `fake` are implemented. Set via `.env` (see SPEC §8.3).
+- **Provider selection** is per-capability (translate, TTS, STT). Currently `google`, `fake`, and `ollama` (translate only) are implemented. Set via `.env` (see SPEC §8.3).
+- **Ollama provider** uses a local Ollama server for translation. It also returns a word-by-word explanation rendered below the translation form. Set `MYGLOT_TRANSLATE_PROVIDER=ollama` and optionally configure `MYGLOT_OLLAMA_BASE_URL` and `MYGLOT_OLLAMA_MODEL` in `.env`. Requires `ollama serve` running locally with the model pulled (e.g. `ollama pull translategemma:latest`).
 
 ## Development (without Docker)
 
@@ -88,6 +89,7 @@ backend/          Python FastAPI backend
       registry.py Factory functions with @lru_cache
       google/     Google Cloud implementations (Translate v2, TTS, STT)
       fake/       Stubs for offline dev/testing
+      ollama/     Local Ollama LLM translation (with word-by-word explanation)
     services/     Pure business logic
       similarity.py  Scoring + word diff
       audio_store.py File paths, save, delete

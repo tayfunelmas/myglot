@@ -48,6 +48,7 @@ def _item_to_out(item: Item) -> ItemOut:
         target_lang=item.target_lang,
         source_text=item.source_text,
         target_text=item.target_text,
+        explanation=item.explanation,
         audio_url=f"/api/items/{item.id}/audio" if item.audio_path else None,
         audio_voice=item.audio_voice,
         audio_provider=item.audio_provider,
@@ -147,10 +148,10 @@ def translate_text(data: TranslateRequest, session: Session = Depends(get_sessio
     settings = _get_settings(session)
     try:
         translator = get_translator()
-        target_text = translator.translate(source_text, settings.source_lang, settings.target_lang)
+        result = translator.translate(source_text, settings.source_lang, settings.target_lang)
     except ProviderError as e:
         raise ProviderAPIError("translator", str(e)) from e
-    return TranslateResponse(target_text=target_text)
+    return TranslateResponse(target_text=result.text, explanation=result.explanation)
 
 
 @router.post("/translate-back", response_model=TranslateBackResponse)
@@ -161,10 +162,10 @@ def translate_back(data: TranslateBackRequest, session: Session = Depends(get_se
     settings = _get_settings(session)
     try:
         translator = get_translator()
-        source_text = translator.translate(target_text, settings.target_lang, settings.source_lang)
+        result = translator.translate(target_text, settings.target_lang, settings.source_lang)
     except ProviderError as e:
         raise ProviderAPIError("translator", str(e)) from e
-    return TranslateBackResponse(source_text=source_text)
+    return TranslateBackResponse(source_text=result.text, explanation=result.explanation)
 
 
 @router.post("/tts/preview")
@@ -220,6 +221,7 @@ def create_item(data: ItemCreate, session: Session = Depends(get_session)):
                 category_id = cat.id
 
     # Translate (skip if target_text already provided)
+    explanation = data.explanation
     if data.target_text:
         target_text = data.target_text.strip()
         if not target_text:
@@ -227,9 +229,11 @@ def create_item(data: ItemCreate, session: Session = Depends(get_session)):
     else:
         try:
             translator = get_translator()
-            target_text = translator.translate(
+            tr_result = translator.translate(
                 source_text, settings.source_lang, settings.target_lang
             )
+            target_text = tr_result.text
+            explanation = tr_result.explanation
         except ProviderError as e:
             raise ProviderAPIError("translator", str(e)) from e
 
@@ -257,6 +261,7 @@ def create_item(data: ItemCreate, session: Session = Depends(get_session)):
         target_lang=settings.target_lang,
         source_text=source_text,
         target_text=target_text,
+        explanation=explanation,
         sort_order=new_order,
         audio_path=audio_path,
         audio_voice=audio_voice,
@@ -290,6 +295,9 @@ def update_item(item_id: int, data: ItemUpdate, session: Session = Depends(get_s
         if new_text != item.target_text:
             item.target_text = new_text
             item.audio_stale = True
+
+    if data.explanation is not None:
+        item.explanation = data.explanation or None
 
     if data.category_id is not None:
         # Allow setting to 0 or null to uncategorize

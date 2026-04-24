@@ -19,6 +19,7 @@ class Item(SQLModel, table=True):
     target_lang: str
     source_text: str
     target_text: str
+    explanation: Optional[str] = None
     sort_order: int = Field(default=0, index=True)
     audio_path: Optional[str] = None
     audio_voice: Optional[str] = None

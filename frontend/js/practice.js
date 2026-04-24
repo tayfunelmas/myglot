@@ -50,6 +50,12 @@ function renderPracticeItem(item) {
   const catBadge = item.category
     ? `<span class="category-badge">${escapeHtml(item.category.name)}</span>`
     : "";
+  const explanationBtn = item.explanation
+    ? `<button type="button" class="icon-btn btn-explanation" data-id="${item.id}" title="Show explanation"><span class="material-symbols-rounded">school</span></button>`
+    : "";
+  const explanationRow = item.explanation
+    ? `<tr class="explanation-row hidden" id="practice-explanation-row-${item.id}"><td colspan="4"><div class="inline-explanation explanation-content">${renderMarkdown(item.explanation)}</div></td></tr>`
+    : "";
   return `
     <tr class="item-row" data-id="${item.id}">
       <td class="col-source">${escapeHtml(item.source_text)}</td>
@@ -59,6 +65,7 @@ function renderPracticeItem(item) {
       <td class="col-meta">${catBadge}</td>
       <td class="col-actions">
         <div class="row-actions">
+          ${explanationBtn}
           <button type="button" class="icon-btn btn-reveal" data-id="${item.id}" title="Reveal / Hide"><span class="material-symbols-rounded">visibility</span></button>
           ${item.audio_url ? `<button type="button" class="icon-btn btn-play" data-id="${item.id}" title="Play audio"><span class="material-symbols-rounded">play_arrow</span></button>` : ""}
           ${item.audio_url ? `<a href="${api.audioDownloadUrl(item.id)}" class="icon-btn" title="Download audio"><span class="material-symbols-rounded">download</span></a>` : ""}
@@ -67,10 +74,28 @@ function renderPracticeItem(item) {
         <audio id="practice-audio-${item.id}" preload="none"></audio>
         <div id="result-${item.id}"></div>
       </td>
-    </tr>`;
+    </tr>${explanationRow}`;
+}
+
+function renderMarkdown(md) {
+  if (typeof marked !== "undefined" && marked.parse) {
+    return marked.parse(md);
+  }
+  return escapeHtml(md).replace(/\n/g, "<br>");
 }
 
 function attachPracticeListeners() {
+  // Explanation buttons
+  document.querySelectorAll("#practice-list .btn-explanation").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      const row = document.getElementById(`practice-explanation-row-${id}`);
+      if (row) {
+        row.classList.toggle("hidden");
+      }
+    });
+  });
+
   // Reveal buttons
   document.querySelectorAll("#practice-list .btn-reveal").forEach((btn) => {
     btn.addEventListener("click", () => {
