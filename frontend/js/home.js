@@ -3,6 +3,9 @@ import { debounce, escapeHtml, setStatus } from "./util.js";
 
 let allCategories = [];
 let _currentExplanation = null;
+let _homePageSize = parseInt(localStorage.getItem("myglot_home-page-size") || "50", 10);
+let _homeOffset = 0;
+let _homeTotal = 0;
 
 export async function initHome() {
   await loadCategories();
@@ -14,9 +17,34 @@ export async function initHome() {
   document.getElementById("btn-add-item").addEventListener("click", addItem);
   document.getElementById("home-search").addEventListener(
     "input",
-    debounce(() => loadItems()),
+    debounce(() => {
+      _homeOffset = 0;
+      loadItems();
+    }),
   );
-  document.getElementById("home-category-filter").addEventListener("change", () => loadItems());
+  document.getElementById("home-category-filter").addEventListener("change", () => {
+    _homeOffset = 0;
+    loadItems();
+  });
+
+  // Pagination
+  document.getElementById("home-page-size").value = String(_homePageSize);
+  document.getElementById("home-page-size").addEventListener("change", (e) => {
+    _homePageSize = parseInt(e.target.value, 10);
+    localStorage.setItem("myglot_home-page-size", String(_homePageSize));
+    _homeOffset = 0;
+    loadItems();
+  });
+  document.getElementById("home-prev-page").addEventListener("click", () => {
+    _homeOffset = Math.max(0, _homeOffset - _homePageSize);
+    loadItems();
+  });
+  document.getElementById("home-next-page").addEventListener("click", () => {
+    if (_homeOffset + _homePageSize < _homeTotal) {
+      _homeOffset += _homePageSize;
+      loadItems();
+    }
+  });
   document
     .querySelector(".btn-close-explanation")
     ?.addEventListener("click", () => hideExplanation());
@@ -138,6 +166,18 @@ function showEditExplanation(markdown) {
   container.classList.remove("hidden");
 }
 
+function updatePaginationUI(prefix, offset, pageSize, total) {
+  const info = document.getElementById(`${prefix}-page-info`);
+  const prevBtn = document.getElementById(`${prefix}-prev-page`);
+  const nextBtn = document.getElementById(`${prefix}-next-page`);
+  if (!info) return;
+  const start = total === 0 ? 0 : offset + 1;
+  const end = Math.min(offset + pageSize, total);
+  info.textContent = `${start}–${end} of ${total}`;
+  prevBtn.disabled = offset === 0;
+  nextBtn.disabled = offset + pageSize >= total;
+}
+
 async function previewAudio() {
   const targetText = document.getElementById("target-text").value.trim();
   if (!targetText) {
@@ -210,9 +250,11 @@ export async function loadItems() {
 
   const container = document.getElementById("items-list");
   try {
-    const params = { q };
+    const params = { q, limit: _homePageSize, offset: _homeOffset };
     if (selectedIds.length > 0) params.category_ids = selectedIds.join(",");
     const data = await api.listItems(params);
+    _homeTotal = data.total;
+    updatePaginationUI("home", _homeOffset, _homePageSize, _homeTotal);
     if (data.items.length === 0) {
       container.innerHTML =
         '<p style="color:var(--md-sys-color-on-surface-variant); text-align:center;">No items yet. Add one above!</p>';

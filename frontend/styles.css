@@ -1083,6 +1083,41 @@ button.small.danger:hover {
   }
 }
 
+/* --- Pagination --- */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 4px;
+}
+
+.pagination-size {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 12px;
+  font-size: 13px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.pagination-size select {
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface-container);
+  font-size: 13px;
+  color: var(--md-sys-color-on-surface);
+}
+
+.page-info {
+  font-size: 13px;
+  color: var(--md-sys-color-on-surface-variant);
+  min-width: 100px;
+  text-align: center;
+}
+
 /* --- Translation Explanation Area --- */
 .explanation-area {
   margin-top: 16px;

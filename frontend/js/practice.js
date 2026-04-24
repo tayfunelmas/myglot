@@ -3,11 +3,34 @@ import { Recorder } from "./recorder.js";
 import { escapeHtml, renderDiff, scoreClass } from "./util.js";
 
 const recorder = new Recorder();
+let _practicePageSize = parseInt(localStorage.getItem("myglot_practice-page-size") || "50", 10);
+let _practiceOffset = 0;
+let _practiceTotal = 0;
 
 export async function initPractice() {
-  document
-    .getElementById("practice-category-filter")
-    .addEventListener("change", () => loadPracticeItems());
+  document.getElementById("practice-category-filter").addEventListener("change", () => {
+    _practiceOffset = 0;
+    loadPracticeItems();
+  });
+
+  // Pagination
+  document.getElementById("practice-page-size").value = String(_practicePageSize);
+  document.getElementById("practice-page-size").addEventListener("change", (e) => {
+    _practicePageSize = parseInt(e.target.value, 10);
+    localStorage.setItem("myglot_practice-page-size", String(_practicePageSize));
+    _practiceOffset = 0;
+    loadPracticeItems();
+  });
+  document.getElementById("practice-prev-page").addEventListener("click", () => {
+    _practiceOffset = Math.max(0, _practiceOffset - _practicePageSize);
+    loadPracticeItems();
+  });
+  document.getElementById("practice-next-page").addEventListener("click", () => {
+    if (_practiceOffset + _practicePageSize < _practiceTotal) {
+      _practiceOffset += _practicePageSize;
+      loadPracticeItems();
+    }
+  });
 }
 
 export async function loadPracticeItems() {
@@ -18,9 +41,11 @@ export async function loadPracticeItems() {
   const container = document.getElementById("practice-list");
 
   try {
-    const params = {};
+    const params = { limit: _practicePageSize, offset: _practiceOffset };
     if (selectedIds.length > 0) params.category_ids = selectedIds.join(",");
     const data = await api.listItems(params);
+    _practiceTotal = data.total;
+    updatePracticePaginationUI();
     if (data.items.length === 0) {
       container.innerHTML =
         '<p style="color:var(--md-sys-color-on-surface-variant); text-align:center;">No items to practice. Add some from the Home tab!</p>';
@@ -161,4 +186,16 @@ function attachPracticeListeners() {
       }
     });
   });
+}
+
+function updatePracticePaginationUI() {
+  const info = document.getElementById("practice-page-info");
+  const prevBtn = document.getElementById("practice-prev-page");
+  const nextBtn = document.getElementById("practice-next-page");
+  if (!info) return;
+  const start = _practiceTotal === 0 ? 0 : _practiceOffset + 1;
+  const end = Math.min(_practiceOffset + _practicePageSize, _practiceTotal);
+  info.textContent = `${start}–${end} of ${_practiceTotal}`;
+  prevBtn.disabled = _practiceOffset === 0;
+  nextBtn.disabled = _practiceOffset + _practicePageSize >= _practiceTotal;
 }
