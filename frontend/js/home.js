@@ -126,6 +126,18 @@ function hideExplanation() {
   content.innerHTML = "";
 }
 
+function showEditExplanation(markdown) {
+  const container = document.getElementById("edit-explanation");
+  const content = document.getElementById("edit-explanation-content");
+  if (!markdown) {
+    container.classList.add("hidden");
+    content.innerHTML = "";
+    return;
+  }
+  content.innerHTML = renderMarkdown(markdown);
+  container.classList.remove("hidden");
+}
+
 async function previewAudio() {
   const targetText = document.getElementById("target-text").value.trim();
   if (!targetText) {
@@ -373,12 +385,14 @@ async function openEditModal(id) {
   document.getElementById("edit-source-text").value = item.source_text;
   document.getElementById("edit-target-text").value = item.target_text;
   document.getElementById("edit-category-select").value = item.category?.id || "0";
+  showEditExplanation(item.explanation);
   document.getElementById("edit-modal").classList.remove("hidden");
   setStatus(document.getElementById("edit-status"), "");
 }
 
 function closeEditModal() {
   document.getElementById("edit-modal").classList.add("hidden");
+  showEditExplanation(null);
 }
 
 async function saveEdit() {
@@ -459,6 +473,7 @@ async function retranslateFromEditModal() {
   try {
     const result = await api.translate(sourceText);
     document.getElementById("edit-target-text").value = result.target_text;
+    showEditExplanation(result.explanation);
     // Save the new translation + explanation
     await api.updateItem(id, {
       target_text: result.target_text,
