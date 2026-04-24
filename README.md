@@ -31,7 +31,7 @@ task up
 - **Automatic backups** can be configured in Settings with a cron expression.
 - **Export to CSV** is in Settings → Export Data. Downloads all items (source text, translation, category) sorted by category and order — ready for Excel or Google Sheets.
 - **Provider selection** is per-capability (translate, TTS, STT). Currently `google`, `fake`, and `ollama` (translate only) are implemented. Set via `.env` (see SPEC §8.3).
-- **Ollama provider** uses a local Ollama server for translation. It also returns a word-by-word explanation rendered below the translation form. Set `MYGLOT_TRANSLATE_PROVIDER=ollama` and optionally configure `MYGLOT_OLLAMA_BASE_URL` and `MYGLOT_OLLAMA_MODEL` in `.env`. Requires `ollama serve` running locally with the model pulled (e.g. `ollama pull translategemma:latest`).
+- **Ollama provider** uses a local Ollama server for translation. It also returns a word-by-word explanation rendered below the translation form. Set `MYGLOT_TRANSLATE_PROVIDER=ollama` and optionally configure `MYGLOT_OLLAMA_BASE_URL` and `MYGLOT_OLLAMA_MODEL` in `.env`. See [docs/OLLAMA_SETUP.md](docs/OLLAMA_SETUP.md) for full setup instructions.
 
 ## Development (without Docker)
 

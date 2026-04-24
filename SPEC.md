@@ -986,6 +986,7 @@ myglot/
     copilot-instructions.md
   docs/
     GOOGLE_CLOUD_SETUP.md
+    OLLAMA_SETUP.md
   backend/
     Dockerfile
     requirements.txt
