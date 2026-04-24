@@ -44,11 +44,13 @@ export const api = {
   createItem: (data) => request("POST", "/items", data),
   translate: (sourceText) => request("POST", "/translate", { source_text: sourceText }),
   translateBack: (targetText) => request("POST", "/translate-back", { target_text: targetText }),
-  ttsPreview: async (text) => {
+  ttsPreview: async (text, voice) => {
+    const body = { text };
+    if (voice) body.voice = voice;
     const resp = await fetch(`${BASE}/tts/preview`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify(body),
     });
     if (!resp.ok) {
       const data = await resp.json();

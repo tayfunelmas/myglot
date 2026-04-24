@@ -47,6 +47,7 @@ class TranslateBackResponse(BaseModel):
 
 class TtsPreviewRequest(BaseModel):
     text: str
+    voice: str | None = None
 
 
 # --- Items ---

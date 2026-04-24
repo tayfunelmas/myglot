@@ -176,7 +176,7 @@ def tts_preview(data: TtsPreviewRequest, session: Session = Depends(get_session)
     settings = _get_settings(session)
     try:
         tts = get_tts()
-        voice_id = settings.tts_voice or None
+        voice_id = data.voice if data.voice is not None else (settings.tts_voice or None)
         result = tts.synthesize(text, settings.target_lang, voice_id)
     except ProviderError as e:
         raise ProviderAPIError("tts", str(e)) from e

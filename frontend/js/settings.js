@@ -19,6 +19,11 @@ export async function initSettings() {
   document.getElementById("btn-save-settings").addEventListener("click", saveSettings);
   document.getElementById("btn-load-voices").addEventListener("click", loadVoices);
   document.getElementById("btn-test-providers").addEventListener("click", testProviders);
+  document.getElementById("btn-sample-voice").addEventListener("click", playSampleVoice);
+
+  // Auto-load voices so the saved selection is restored
+  const targetLang = document.getElementById("setting-target-lang").value.trim();
+  if (targetLang) await loadVoices();
 
   // CSV export
   document.getElementById("btn-export-csv").href = api.exportCsvUrl();
@@ -74,6 +79,23 @@ async function loadVoices() {
     delete select.dataset.pending;
   } catch (e) {
     alert(`Could not load voices: ${e.message}`);
+  }
+}
+
+async function playSampleVoice() {
+  const status = document.getElementById("settings-status");
+  const voice = document.getElementById("setting-tts-voice").value || undefined;
+  const sampleText = "This is a sample of the selected voice.";
+  try {
+    setStatus(status, "Generating sample…", "loading");
+    const blob = await api.ttsPreview(sampleText, voice);
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    audio.addEventListener("ended", () => URL.revokeObjectURL(url));
+    audio.play();
+    setStatus(status, "", "");
+  } catch (e) {
+    setStatus(status, e.message, "error");
   }
 }
 
