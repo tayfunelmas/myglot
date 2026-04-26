@@ -13,6 +13,7 @@ services:
       MYGLOT_DATA_DIR: /app/data
       MYGLOT_HOST: "0.0.0.0"
       MYGLOT_PORT: "8000"
+      MYGLOT_OLLAMA_BASE_URL: "http://host.docker.internal:11434"
     volumes:
       - ./data:/app/data
       - ./secrets:/app/secrets:ro

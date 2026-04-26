@@ -56,7 +56,33 @@ ollama serve
 
 This starts the server on `http://localhost:11434` by default. Keep this terminal open, or run it in the background.
 
-> **Tip:** On macOS, if you installed Ollama via the desktop app, the server starts automatically when you open the app. You can check with:
+### Run Ollama as a background service (auto-start on boot)
+
+Instead of keeping a terminal open, you can run Ollama as a persistent background service:
+
+**macOS (Desktop app):** Launch **Ollama.app** from `/Applications` (or search via Spotlight). It stays in the menu bar and auto-starts on login. This is the recommended approach.
+
+**macOS (Homebrew only):** If you installed via `brew install ollama`:
+```bash
+brew services start ollama
+```
+
+**Linux (systemd):**
+```bash
+sudo systemctl enable ollama
+sudo systemctl start ollama
+```
+
+To stop the background service:
+```bash
+# macOS (Homebrew)
+brew services stop ollama
+
+# Linux
+sudo systemctl stop ollama
+```
+
+> **Tip:** You can verify the server is running with:
 > ```bash
 > curl -s http://localhost:11434/ | head -1
 > ```
