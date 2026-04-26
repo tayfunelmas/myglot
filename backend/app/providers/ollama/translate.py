@@ -99,6 +99,18 @@ class OllamaTranslator(Translator):
         self._base_url = base_url.rstrip("/")
         self._model = model
 
+    def ping(self) -> None:
+        """Verify Ollama is reachable (GET /)."""
+        try:
+            req = urllib.request.Request(f"{self._base_url}/", method="GET")
+            with urllib.request.urlopen(req, timeout=5):
+                pass
+        except urllib.error.URLError as e:
+            raise ProviderError(
+                f"Ollama connection error ({self._base_url}): {e}. "
+                "Is the Ollama server running? Start it with: ollama serve"
+            ) from e
+
     def translate(self, text: str, source_lang: str, target_lang: str) -> TranslateResult:
         prompt = _build_prompt(text, source_lang, target_lang)
         try:

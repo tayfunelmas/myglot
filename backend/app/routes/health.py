@@ -32,6 +32,8 @@ def health_providers():
     def check_translator() -> ProviderStatus:
         try:
             t = get_translator()
+            if hasattr(t, "ping"):
+                t.ping()
             return ProviderStatus(provider=t.name, ok=True)
         except (ProviderError, Exception) as e:
             return ProviderStatus(provider=cfg.translate_provider, ok=False, error=str(e))
