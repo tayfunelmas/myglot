@@ -135,6 +135,7 @@ A personal, single-user web app for learning a target language by accumulating a
 | F13 | Database restore: `POST /api/restore` accepts a `.db` file upload, validates it, and replaces the current database. |
 | F14 | Automatic backup schedule: configurable via `GET/PUT /api/backup-schedule`. Background task checks cron expression every 60s and creates a consistent SQLite snapshot in the configured destination, rotating old backups. |
 | F15 | CSV export: `GET /api/items/export` streams all items as a UTF-8 CSV (columns: `source_text`, `target_text`, `category`), sorted by category name then `sort_order`. Download button in Settings. |
+| F16 | CRUD for notes: create, list, get, update, delete. Notes have a title (plain text) and body (Markdown). Displayed in the Notes tab with rendered HTML. |
 
 ## 4. Non-Functional Requirements
 - **Simplicity:** minimal dependencies; easy to run with one command.
@@ -235,6 +236,17 @@ A personal, single-user web app for learning a target language by accumulating a
 | `last_run_at`    | DATETIME    | UTC, nullable |
 | `last_status`    | TEXT        | `ok: <filename>` or `error: <message>` |
 
+**Table: `note`**
+
+| Column       | Type        | Notes |
+|--------------|-------------|-------|
+| `id`         | INTEGER PK  | autoincrement |
+| `title`      | TEXT        | NOT NULL, single-line plain text |
+| `body`       | TEXT        | NOT NULL, Markdown content, default empty |
+| `sort_order` | INTEGER     | display order, default 0 |
+| `created_at` | DATETIME    | UTC |
+| `updated_at` | DATETIME    | UTC |
+
 ### 6.2 Database Migrations
 
 The schema evolves over time without losing user data. Migrations live in `backend/app/migrations/` as numbered Python modules.
@@ -326,6 +338,11 @@ Base path: `/api`. All JSON unless noted.
 | GET    | `/api/items/{id}/audio`      | —                                                           | `audio/mpeg` (inline) |
 | GET    | `/api/items/{id}/audio?download=1` | —                                                     | `audio/mpeg` (attachment) |
 | POST   | `/api/items/{id}/practice`   | multipart: `audio` (webm/ogg/wav)                           | `{transcript, score, diff:[...]}` |
+| GET    | `/api/notes`                 | —                                                           | `[Note]` (ordered by created_at desc) |
+| POST   | `/api/notes`                 | `{title, body?}`                                            | `201` + `Note` |
+| GET    | `/api/notes/{id}`            | —                                                           | `Note` |
+| PATCH  | `/api/notes/{id}`            | `{title?, body?}`                                           | `Note` |
+| DELETE | `/api/notes/{id}`            | —                                                           | `204` |
 
 ### Item DTO
 ```json
@@ -364,12 +381,13 @@ backend/
     config.py               # env + settings
     db.py                   # SQLModel engine, session
     migrate.py              # versioned migration runner
-    models.py               # Item, Settings, Category, BackupSchedule
+    models.py               # Item, Settings, Category, BackupSchedule, Note
     schemas.py              # Pydantic DTOs
     errors.py               # Uniform error classes (AppError, NotFoundError, etc.)
     scheduler.py            # Background task: automatic backup runner (croniter)
     routes/
       items.py
+      notes.py
       categories.py
       settings.py
       voices.py
@@ -379,6 +397,7 @@ backend/
       001_add_sort_order.py
       002_add_backup_schedule.py
       003_add_item_explanation.py
+      004_add_note_table.py
     providers/              # pluggable external services (see §8.1)
       __init__.py
       base.py               # abstract interfaces (ABC) + DTOs
@@ -1005,6 +1024,8 @@ myglot/
         __init__.py
         001_add_sort_order.py
         002_add_backup_schedule.py
+        003_add_item_explanation.py
+        004_add_note_table.py
       routes/
         __init__.py
         health.py
@@ -1012,6 +1033,7 @@ myglot/
         voices.py
         categories.py
         items.py
+        notes.py
       providers/
         __init__.py
         base.py
@@ -1045,6 +1067,7 @@ myglot/
       home.js
       practice.js
       settings.js
+      notes.js
       app.js
   data/                     # gitignored; created at first run
     myglot.db

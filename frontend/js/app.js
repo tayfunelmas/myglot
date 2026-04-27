@@ -1,4 +1,5 @@
 import { initHome, loadCategories, loadItems } from "./home.js";
+import { initNotes, loadNotes } from "./notes.js";
 import { initPractice, loadPracticeItems } from "./practice.js";
 import { initSettings } from "./settings.js";
 
@@ -27,6 +28,8 @@ tabs.forEach((tab) => {
     } else if (target === "practice") {
       loadCategories();
       loadPracticeItems();
+    } else if (target === "notes") {
+      loadNotes();
     }
   });
 });
@@ -35,5 +38,6 @@ tabs.forEach((tab) => {
 (async () => {
   await initHome();
   await initPractice();
+  await initNotes();
   await initSettings();
 })();

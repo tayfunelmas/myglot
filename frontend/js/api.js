@@ -85,4 +85,11 @@ export const api = {
 
   // CSV export URL (direct browser download)
   exportCsvUrl: () => `${BASE}/items/export`,
+
+  // Notes
+  listNotes: () => request("GET", "/notes"),
+  createNote: (data) => request("POST", "/notes", data),
+  getNote: (id) => request("GET", `/notes/${id}`),
+  updateNote: (id, data) => request("PATCH", `/notes/${id}`, data),
+  deleteNote: (id) => request("DELETE", `/notes/${id}`),
 };

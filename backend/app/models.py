@@ -46,3 +46,12 @@ class BackupSchedule(SQLModel, table=True):
     max_backups: int = 7  # rotate: keep last N backups
     last_run_at: Optional[datetime] = None
     last_status: str = ""
+
+
+class Note(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    title: str
+    body: str = ""
+    sort_order: int = Field(default=0, index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

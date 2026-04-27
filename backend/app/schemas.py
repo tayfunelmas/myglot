@@ -99,6 +99,25 @@ class SettingsUpdate(BaseModel):
     tts_voice: str | None = None
 
 
+# --- Notes ---
+class NoteCreate(BaseModel):
+    title: str
+    body: str = ""
+
+
+class NoteUpdate(BaseModel):
+    title: str | None = None
+    body: str | None = None
+
+
+class NoteOut(BaseModel):
+    id: int
+    title: str
+    body: str
+    created_at: datetime
+    updated_at: datetime
+
+
 # --- Practice ---
 class PracticeResult(BaseModel):
     transcript: str

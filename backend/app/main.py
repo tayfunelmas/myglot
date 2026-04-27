@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import get_config
 from .db import init_db
-from .routes import categories, health, items, settings, voices
+from .routes import categories, health, items, notes, settings, voices
 
 app = FastAPI(title="MyGlot", version="0.1.0")
 
@@ -17,6 +17,7 @@ app.include_router(settings.router, prefix="/api")
 app.include_router(voices.router, prefix="/api")
 app.include_router(categories.router, prefix="/api")
 app.include_router(items.router, prefix="/api")
+app.include_router(notes.router, prefix="/api")
 
 
 @app.on_event("startup")
