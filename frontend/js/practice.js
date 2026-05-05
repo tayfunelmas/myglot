@@ -1,6 +1,6 @@
 import { api } from "./api.js";
 import { Recorder } from "./recorder.js";
-import { escapeHtml, renderDiff, scoreClass } from "./util.js";
+import { escapeHtml, isMobile, renderDiff, scoreClass } from "./util.js";
 
 const recorder = new Recorder();
 let _practicePageSize = parseInt(localStorage.getItem("myglot_practice-page-size") || "50", 10);
@@ -49,6 +49,8 @@ export async function loadPracticeItems() {
     if (data.items.length === 0) {
       container.innerHTML =
         '<p style="color:var(--md-sys-color-on-surface-variant); text-align:center;">No items to practice. Add some from the Home tab!</p>';
+    } else if (isMobile()) {
+      container.innerHTML = `<div class="mobile-items">${data.items.map(renderPracticeItemMobile).join("")}</div>`;
     } else {
       container.innerHTML = `
         <table class="items-table practice-table">
@@ -100,6 +102,38 @@ function renderPracticeItem(item) {
         <div id="result-${item.id}"></div>
       </td>
     </tr>${explanationRow}`;
+}
+
+function renderPracticeItemMobile(item) {
+  const catBadge = item.category
+    ? `<span class="category-badge">${escapeHtml(item.category.name)}</span>`
+    : "";
+  const explanationBtn = item.explanation
+    ? `<button type="button" class="icon-btn btn-explanation" data-id="${item.id}" title="Show explanation"><span class="material-symbols-rounded">school</span></button>`
+    : "";
+  const explanationBlock = item.explanation
+    ? `<div class="mobile-explanation hidden" id="practice-explanation-row-${item.id}"><div class="inline-explanation explanation-content">${renderMarkdown(item.explanation)}</div></div>`
+    : "";
+  return `
+    <div class="mobile-item-card" data-id="${item.id}">
+      <div class="mobile-item-source">${escapeHtml(item.source_text)}</div>
+      <div class="mobile-item-target">
+        <span class="target-text hidden-text" id="target-${item.id}" data-revealed="false">${escapeHtml(item.target_text)}</span>
+      </div>
+      <div class="mobile-item-footer">
+        ${catBadge}
+        <div class="row-actions">
+          ${explanationBtn}
+          <button type="button" class="icon-btn btn-reveal" data-id="${item.id}" title="Reveal / Hide"><span class="material-symbols-rounded">visibility</span></button>
+          ${item.audio_url ? `<button type="button" class="icon-btn btn-play" data-id="${item.id}" title="Play audio"><span class="material-symbols-rounded">play_arrow</span></button>` : ""}
+          ${item.audio_url ? `<a href="${api.audioDownloadUrl(item.id)}" class="icon-btn" title="Download audio"><span class="material-symbols-rounded">download</span></a>` : ""}
+          <button type="button" class="icon-btn btn-record" data-id="${item.id}" title="Record"><span class="material-symbols-rounded">mic</span></button>
+        </div>
+      </div>
+      <audio id="practice-audio-${item.id}" preload="none"></audio>
+      <div id="result-${item.id}"></div>
+      ${explanationBlock}
+    </div>`;
 }
 
 function renderMarkdown(md) {

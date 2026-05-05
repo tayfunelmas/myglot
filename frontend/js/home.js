@@ -1,5 +1,5 @@
 import { api } from "./api.js";
-import { debounce, escapeHtml, setStatus } from "./util.js";
+import { debounce, escapeHtml, isMobile, setStatus } from "./util.js";
 
 let allCategories = [];
 let _currentExplanation = null;
@@ -258,6 +258,9 @@ export async function loadItems() {
     if (data.items.length === 0) {
       container.innerHTML =
         '<p style="color:var(--md-sys-color-on-surface-variant); text-align:center;">No items yet. Add one above!</p>';
+    } else if (isMobile()) {
+      container.innerHTML = `<div class="mobile-items" id="items-tbody">${data.items.map(renderHomeItemMobile).join("")}</div>`;
+      initDragAndDrop();
     } else {
       container.innerHTML = `
         <table class="items-table">
@@ -311,6 +314,35 @@ function renderHomeItem(item) {
     </tr>${explanationRow}`;
 }
 
+function renderHomeItemMobile(item) {
+  const catBadge = item.category
+    ? `<span class="category-badge">${escapeHtml(item.category.name)}</span>`
+    : "";
+  const staleBadge = item.audio_stale ? '<span class="stale-badge">stale</span>' : "";
+  const explanationBtn = item.explanation
+    ? `<button type="button" class="icon-btn btn-explanation" data-id="${item.id}" title="Show explanation"><span class="material-symbols-rounded">school</span></button>`
+    : "";
+  const explanationBlock = item.explanation
+    ? `<div class="mobile-explanation hidden" id="explanation-row-${item.id}"><div class="inline-explanation explanation-content">${renderMarkdown(item.explanation)}</div></div>`
+    : "";
+  return `
+    <div class="mobile-item-card item-row" draggable="true" data-id="${item.id}">
+      <div class="mobile-item-source">${escapeHtml(item.source_text)}</div>
+      <div class="mobile-item-target">${escapeHtml(item.target_text)} ${staleBadge}</div>
+      <div class="mobile-item-footer">
+        ${catBadge}
+        <div class="row-actions">
+          ${explanationBtn}
+          ${item.audio_url ? `<button type="button" class="icon-btn btn-play" data-id="${item.id}" title="Play audio"><span class="material-symbols-rounded">play_arrow</span></button>` : ""}
+          <button type="button" class="icon-btn btn-edit" data-id="${item.id}" title="Edit"><span class="material-symbols-rounded">edit</span></button>
+          <button type="button" class="icon-btn danger btn-delete" data-id="${item.id}" title="Delete"><span class="material-symbols-rounded">delete</span></button>
+        </div>
+      </div>
+      <audio id="audio-${item.id}" preload="none"></audio>
+      ${explanationBlock}
+    </div>`;
+}
+
 function renderMarkdown(md) {
   if (typeof marked !== "undefined" && marked.parse) {
     return marked.parse(md);
@@ -324,8 +356,10 @@ function initDragAndDrop() {
   const tbody = document.getElementById("items-tbody");
   if (!tbody) return;
 
+  const rowSelector = isMobile() ? ".item-row" : "tr.item-row";
+
   tbody.addEventListener("dragstart", (e) => {
-    const row = e.target.closest("tr.item-row");
+    const row = e.target.closest(rowSelector);
     if (!row) return;
     _dragSrcRow = row;
     row.classList.add("dragging");
@@ -334,12 +368,12 @@ function initDragAndDrop() {
   });
 
   tbody.addEventListener("dragend", (e) => {
-    const row = e.target.closest("tr.item-row");
+    const row = e.target.closest(rowSelector);
     if (row) {
       row.classList.remove("dragging");
     }
     _dragSrcRow = null;
-    tbody.querySelectorAll("tr.item-row").forEach((r) => {
+    tbody.querySelectorAll(rowSelector).forEach((r) => {
       r.classList.remove("drag-over");
     });
   });
@@ -347,9 +381,9 @@ function initDragAndDrop() {
   tbody.addEventListener("dragover", (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
-    const targetRow = e.target.closest("tr.item-row");
+    const targetRow = e.target.closest(rowSelector);
     if (!targetRow || targetRow === _dragSrcRow) return;
-    tbody.querySelectorAll("tr.item-row").forEach((r) => {
+    tbody.querySelectorAll(rowSelector).forEach((r) => {
       r.classList.remove("drag-over");
     });
     targetRow.classList.add("drag-over");
@@ -357,11 +391,11 @@ function initDragAndDrop() {
 
   tbody.addEventListener("drop", async (e) => {
     e.preventDefault();
-    const targetRow = e.target.closest("tr.item-row");
+    const targetRow = e.target.closest(rowSelector);
     if (!targetRow || !_dragSrcRow || targetRow === _dragSrcRow) return;
 
     // Move DOM row
-    const rows = [...tbody.querySelectorAll("tr.item-row")];
+    const rows = [...tbody.querySelectorAll(rowSelector)];
     const srcIdx = rows.indexOf(_dragSrcRow);
     const tgtIdx = rows.indexOf(targetRow);
     if (srcIdx < tgtIdx) {
@@ -371,7 +405,7 @@ function initDragAndDrop() {
     }
 
     // Persist new order
-    const newOrder = [...tbody.querySelectorAll("tr.item-row")].map((r) =>
+    const newOrder = [...tbody.querySelectorAll(rowSelector)].map((r) =>
       parseInt(r.dataset.id, 10),
     );
     try {

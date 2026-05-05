@@ -31,3 +31,7 @@ export function scoreClass(score) {
   if (score >= 50) return "score-mid";
   return "score-low";
 }
+
+export function isMobile() {
+  return window.innerWidth <= 768;
+}
