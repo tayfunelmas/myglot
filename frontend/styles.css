@@ -1044,33 +1044,24 @@ button.small.danger:hover {
 }
 
 /* ============================================================
-   RESPONSIVE
+   RESPONSIVE — MOBILE (Android / narrow viewports)
    ============================================================ */
-@media (max-width: 640px) {
-  .list-header {
-    flex-direction: column;
-    align-items: flex-start;
+@media (max-width: 768px) {
+  body {
+    padding: 0 10px 24px;
   }
 
-  .filters {
-    width: 100%;
+  header {
+    padding-top: 8px;
+    margin-bottom: 16px;
   }
 
-  .filters .text-field {
-    width: 100%;
+  .app-bar {
+    padding: 6px 4px;
   }
 
-  .form-row-inline {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .items-table .col-meta {
-    display: none;
-  }
-
-  .practice-table .col-actions {
-    width: auto;
+  .app-bar h1 {
+    font-size: 20px;
   }
 
   .tabs {
@@ -1078,8 +1069,259 @@ button.small.danger:hover {
   }
 
   .tab {
+    padding: 10px 6px;
+    font-size: 12px;
+    gap: 4px;
+  }
+
+  .tab .material-symbols-rounded {
+    font-size: 18px;
+  }
+
+  /* Cards */
+  .card {
+    padding: 16px;
+    margin-bottom: 12px;
+    border-radius: var(--md-sys-shape-corner-sm);
+  }
+
+  .card-title {
+    font-size: 18px;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .card-title .material-symbols-rounded {
+    font-size: 22px;
+  }
+
+  .section-title {
+    font-size: 18px;
+    margin-bottom: 12px;
+  }
+
+  /* Form layout: stack vertically */
+  .form-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .form-row-inline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .add-buttons {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .add-buttons .btn {
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+    padding: 12px 10px;
+    font-size: 12px;
+  }
+
+  /* Buttons — larger touch targets */
+  .btn {
+    padding: 12px 16px;
+  }
+
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .icon-btn .material-symbols-rounded {
+    font-size: 22px;
+  }
+
+  /* Filters */
+  .filters {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filters .text-field {
+    width: 100%;
+  }
+
+  .filters select[multiple] {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .list-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* TABLE → CARD layout on mobile */
+  .items-table {
+    display: block;
+    box-shadow: none;
+    background: none;
+  }
+
+  .items-table thead {
+    display: none;
+  }
+
+  .items-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .items-table tbody tr.item-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 12px 14px;
+    gap: 6px 10px;
+    background: var(--md-sys-color-surface-container-lowest);
+    border-radius: var(--md-sys-shape-corner-sm);
+    box-shadow: var(--md-sys-elevation-1);
+    border-bottom: none;
+  }
+
+  .items-table tbody tr.item-row td {
+    border-bottom: none;
+    padding: 0;
+  }
+
+  .items-table .col-drag {
+    width: auto;
+    order: -1;
+  }
+
+  .items-table .col-source {
+    width: 100%;
+    order: 1;
+    font: var(--md-sys-typescale-body-medium);
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .items-table .col-target {
+    width: 100%;
+    order: 2;
+    font: var(--md-sys-typescale-body-large);
+    font-weight: 600;
+  }
+
+  .items-table .col-meta {
+    width: auto;
+    order: 3;
+  }
+
+  .items-table .col-actions {
+    width: 100%;
+    order: 4;
+    text-align: left;
+  }
+
+  .items-table .row-actions {
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  /* Explanation rows also go block */
+  .items-table .explanation-row td {
+    display: block;
+    width: 100%;
+  }
+
+  .items-table tbody tr.explanation-row {
+    display: block;
+    padding: 0;
+    box-shadow: none;
+    margin-top: -4px;
+  }
+
+  /* Practice table specifics */
+  .practice-table .col-actions {
+    width: 100%;
+  }
+
+  .practice-result {
+    padding: 10px;
+  }
+
+  /* Modal — near full screen */
+  .modal-surface {
+    width: 96%;
+    max-width: none;
+    padding: 20px;
+    border-radius: var(--md-sys-shape-corner-lg);
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .modal-actions {
+    flex-wrap: wrap;
+  }
+
+  .modal-actions .btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  /* Pagination */
+  .pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .pagination-size {
+    margin-right: 0;
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Notes */
+  .note-card {
+    padding: 14px;
+  }
+
+  .note-card-title {
+    font-size: 16px;
+  }
+
+  /* Settings buttons */
+  .settings-form .form-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .settings-form .form-row .btn {
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+    font-size: 12px;
     padding: 10px 8px;
-    font-size: 13px;
+  }
+}
+
+/* Extra-small phones */
+@media (max-width: 400px) {
+  .tab {
+    flex-direction: column;
+    padding: 8px 4px;
+    font-size: 11px;
+    gap: 2px;
+  }
+
+  .add-buttons .btn {
+    font-size: 11px;
+    padding: 10px 6px;
+  }
+
+  .add-buttons .btn .material-symbols-rounded {
+    font-size: 16px;
   }
 }
 
