@@ -55,3 +55,17 @@ class Note(SQLModel, table=True):
     sort_order: int = Field(default=0, index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class GeneratedText(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    title: str
+    body: str
+    vocabulary_md: str = ""
+    source_lang: str
+    target_lang: str
+    audio_path: Optional[str] = None
+    audio_voice: Optional[str] = None
+    audio_provider: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

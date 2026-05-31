@@ -2,6 +2,7 @@ import { initHome, loadCategories, loadItems } from "./home.js";
 import { initNotes, loadNotes } from "./notes.js";
 import { initPractice, loadPracticeItems } from "./practice.js";
 import { initSettings } from "./settings.js";
+import { initTexts, loadTexts } from "./texts.js";
 
 // Tab switching
 const tabs = document.querySelectorAll(".tab");
@@ -30,6 +31,8 @@ tabs.forEach((tab) => {
       loadPracticeItems();
     } else if (target === "notes") {
       loadNotes();
+    } else if (target === "texts") {
+      loadTexts();
     }
   });
 });
@@ -39,5 +42,6 @@ tabs.forEach((tab) => {
   await initHome();
   await initPractice();
   await initNotes();
+  await initTexts();
   await initSettings();
 })();

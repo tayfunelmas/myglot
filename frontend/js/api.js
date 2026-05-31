@@ -92,4 +92,12 @@ export const api = {
   getNote: (id) => request("GET", `/notes/${id}`),
   updateNote: (id, data) => request("PATCH", `/notes/${id}`, data),
   deleteNote: (id) => request("DELETE", `/notes/${id}`),
+
+  // Generated Texts
+  listTexts: () => request("GET", "/texts"),
+  createText: (instructions) => request("POST", "/texts", { instructions }),
+  getText: (id) => request("GET", `/texts/${id}`),
+  deleteText: (id) => request("DELETE", `/texts/${id}`),
+  regenerateTextAudio: (id) => request("POST", `/texts/${id}/regenerate-audio`),
+  textAudioUrl: (id) => `${BASE}/texts/${id}/audio`,
 };

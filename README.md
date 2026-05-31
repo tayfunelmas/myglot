@@ -32,6 +32,7 @@ task up
 - **Export to CSV** is in Settings → Export Data. Downloads all items (source text, translation, category) sorted by category and order — ready for Excel or Google Sheets.
 - **Provider selection** is per-capability (translate, TTS, STT). Currently `google`, `fake`, and `ollama` (translate only) are implemented. Set via `.env` (see SPEC §8.3).
 - **Ollama provider** uses a local Ollama server for translation. It also returns a word-by-word explanation rendered below the translation form. Set `MYGLOT_TRANSLATE_PROVIDER=ollama` and optionally configure `MYGLOT_OLLAMA_BASE_URL` and `MYGLOT_OLLAMA_MODEL` in `.env`. See [docs/OLLAMA_SETUP.md](docs/OLLAMA_SETUP.md) for full setup instructions.
+- **Generated Texts** (Texts tab) — describe what you want to learn (e.g. "write a simple dialog for ordering food") and the system generates a target-language text, audio, and a vocabulary table. Requires the `ollama` (or `fake`) translate provider.
 
 ## Development (without Docker)
 
@@ -106,6 +107,7 @@ frontend/         Static HTML + JS + CSS (no build step)
     home.js       Add items, list, edit modal, drag-to-reorder
     practice.js   Play, record, score, reveal/hide
     settings.js   Language config, voice, categories, backup/restore
+    texts.js      Generated learning texts (generate, list, play audio)
     recorder.js   MediaRecorder wrapper
     util.js       Helpers: debounce, escapeHtml, renderDiff, scoreClass
 data/             SQLite DB + audio files (gitignored)
@@ -138,3 +140,6 @@ All endpoints are under `/api`. See [SPEC.md §7](SPEC.md) for the full API tabl
 | `POST /api/items/{id}/practice` | Record + STT + score |
 | `GET /api/backup` | Download DB snapshot |
 | `POST /api/restore` | Restore from backup file |
+| `GET/POST /api/texts` | Generated learning texts (list / create) |
+| `POST /api/texts/{id}/regenerate-audio` | Regenerate audio for a text |
+| `DELETE /api/texts/{id}` | Delete a generated text |

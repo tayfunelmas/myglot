@@ -136,6 +136,7 @@ A personal, single-user web app for learning a target language by accumulating a
 | F14 | Automatic backup schedule: configurable via `GET/PUT /api/backup-schedule`. Background task checks cron expression every 60s and creates a consistent SQLite snapshot in the configured destination, rotating old backups. |
 | F15 | CSV export: `GET /api/items/export` streams all items as a UTF-8 CSV (columns: `source_text`, `target_text`, `category`), sorted by category name then `sort_order`. Download button in Settings. |
 | F16 | CRUD for notes: create, list, get, update, delete. Notes have a title (plain text) and body (Markdown). Displayed in the Notes tab with rendered HTML. |
+| F17 | Generated learning texts: user provides instructions (source language), system generates a target-language text/dialog + vocabulary table (Markdown) + TTS audio. Displayed in the Texts tab. CRUD: create (generate), list, get, delete, regenerate audio. |
 
 ## 4. Non-Functional Requirements
 - **Simplicity:** minimal dependencies; easy to run with one command.
@@ -247,6 +248,22 @@ A personal, single-user web app for learning a target language by accumulating a
 | `created_at` | DATETIME    | UTC |
 | `updated_at` | DATETIME    | UTC |
 
+**Table: `generatedtext`**
+
+| Column          | Type        | Notes |
+|-----------------|-------------|-------|
+| `id`            | INTEGER PK  | autoincrement |
+| `title`         | TEXT        | NOT NULL, source-language title |
+| `body`          | TEXT        | NOT NULL, target-language generated text/dialog |
+| `vocabulary_md` | TEXT        | NOT NULL, Markdown vocabulary table, default empty |
+| `source_lang`   | TEXT        | NOT NULL, BCP-47 |
+| `target_lang`   | TEXT        | NOT NULL, BCP-47 |
+| `audio_path`    | TEXT        | relative path under `data/audio/`, nullable |
+| `audio_voice`   | TEXT        | voice name used |
+| `audio_provider`| TEXT        | which TTS provider produced the audio |
+| `created_at`    | DATETIME    | UTC |
+| `updated_at`    | DATETIME    | UTC |
+
 ### 6.2 Database Migrations
 
 The schema evolves over time without losing user data. Migrations live in `backend/app/migrations/` as numbered Python modules.
@@ -343,6 +360,12 @@ Base path: `/api`. All JSON unless noted.
 | GET    | `/api/notes/{id}`            | —                                                           | `Note` |
 | PATCH  | `/api/notes/{id}`            | `{title?, body?}`                                           | `Note` |
 | DELETE | `/api/notes/{id}`            | —                                                           | `204` |
+| GET    | `/api/texts`                 | —                                                           | `[GeneratedText]` (ordered by created_at desc) |
+| POST   | `/api/texts`                 | `{instructions}`                                            | `201` + `GeneratedText` (generates text + vocabulary + audio) |
+| GET    | `/api/texts/{id}`            | —                                                           | `GeneratedText` |
+| DELETE | `/api/texts/{id}`            | —                                                           | `204` |
+| POST   | `/api/texts/{id}/regenerate-audio` | —                                                     | `GeneratedText` (fresh audio) |
+| GET    | `/api/texts/{id}/audio`      | —                                                           | `audio/mpeg` (inline) |
 
 ### Item DTO
 ```json
@@ -388,6 +411,7 @@ backend/
     routes/
       items.py
       notes.py
+      texts.py              # Generated learning texts CRUD
       categories.py
       settings.py
       voices.py
@@ -398,10 +422,11 @@ backend/
       002_add_backup_schedule.py
       003_add_item_explanation.py
       004_add_note_table.py
+      005_add_generatedtext_table.py
     providers/              # pluggable external services (see §8.1)
       __init__.py
       base.py               # abstract interfaces (ABC) + DTOs
-      registry.py           # factory functions get_translator(), get_tts(), get_stt() cached with @lru_cache
+      registry.py           # factory functions get_translator(), get_tts(), get_stt(), get_text_generator() cached with @lru_cache
       google/
         translate.py         # Uses Google Translate v2 (not v3)
         tts.py
@@ -410,6 +435,10 @@ backend/
         translate.py
         tts.py
         stt.py
+        generate.py         # Fake text generator stub
+      ollama/
+        translate.py        # Ollama LLM translation
+        generate.py         # Ollama LLM text generation (texts + vocabulary)
     services/
       similarity.py         # scoring + diff (pure, no provider)
       audio_store.py        # paths, atomic replace, delete
@@ -464,6 +493,16 @@ class STT(ABC):
     # mime examples: "audio/webm;codecs=opus", "audio/wav"
     @abstractmethod
     def transcribe(self, audio_bytes: bytes, mime: str, lang: str) -> STTResult: ...
+
+class TextGenerateResult(BaseModel):
+    title: str          # source-language title
+    body: str           # target-language text/dialog
+    vocabulary_md: str  # Markdown vocabulary table
+
+class TextGenerator(ABC):
+    name: str
+    @abstractmethod
+    def generate(self, instructions: str, source_lang: str, target_lang: str) -> TextGenerateResult: ...
 
 class ProviderError(Exception): ...        # wraps vendor SDK errors uniformly
 class ProviderNotConfigured(ProviderError): ...
@@ -1026,6 +1065,7 @@ myglot/
         002_add_backup_schedule.py
         003_add_item_explanation.py
         004_add_note_table.py
+        005_add_generatedtext_table.py
       routes/
         __init__.py
         health.py
@@ -1034,6 +1074,7 @@ myglot/
         categories.py
         items.py
         notes.py
+        texts.py
       providers/
         __init__.py
         base.py
@@ -1051,6 +1092,9 @@ myglot/
         ollama/
           __init__.py
           translate.py
+          generate.py
+        fake/
+          generate.py
       services/
         __init__.py
         audio_store.py
@@ -1068,6 +1112,7 @@ myglot/
       practice.js
       settings.js
       notes.js
+      texts.js
       app.js
   data/                     # gitignored; created at first run
     myglot.db

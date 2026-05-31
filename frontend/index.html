@@ -30,6 +30,10 @@
                 <span class="material-symbols-rounded">description</span>
                 Notes
             </button>
+            <button type="button" class="tab" data-tab="texts">
+                <span class="material-symbols-rounded">auto_stories</span>
+                Texts
+            </button>
             <button type="button" class="tab" data-tab="settings">
                 <span class="material-symbols-rounded">settings</span>
                 Settings
@@ -193,6 +197,33 @@
                 <div id="note-add-status" class="status"></div>
             </div>
             <div id="notes-list" class="notes-list"></div>
+        </section>
+
+        <!-- TEXTS TAB -->
+        <section id="texts" class="tab-content">
+            <h2 class="section-title">
+                <span class="material-symbols-rounded">auto_stories</span>
+                Generated Texts
+            </h2>
+            <div class="card add-form">
+                <h3 class="card-subtitle">
+                    <span class="material-symbols-rounded">edit_note</span>
+                    Generate Learning Text
+                </h3>
+                <p class="card-description">Describe what text you'd like to generate for learning. For example: "write a simple dialog for ordering food at a restaurant" or "write a short paragraph about rooms of a house".</p>
+                <div class="text-field">
+                    <textarea id="text-instructions" rows="3" placeholder=" "></textarea>
+                    <label for="text-instructions">Instructions (in your source language)</label>
+                </div>
+                <div class="form-row">
+                    <button type="button" id="btn-generate-text" class="btn btn-filled">
+                        <span class="material-symbols-rounded">auto_awesome</span>
+                        Generate
+                    </button>
+                </div>
+                <div id="text-gen-status" class="status"></div>
+            </div>
+            <div id="texts-list" class="texts-list"></div>
         </section>
 
         <!-- SETTINGS TAB -->
@@ -418,6 +449,7 @@
     <script type="module" src="/js/home.js"></script>
     <script type="module" src="/js/practice.js"></script>
     <script type="module" src="/js/notes.js"></script>
+    <script type="module" src="/js/texts.js"></script>
     <script type="module" src="/js/settings.js"></script>
     <script type="module" src="/js/app.js"></script>
 </body>

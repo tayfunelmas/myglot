@@ -3,8 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from ..config import Config, get_config
-from .base import STT, TTS, ProviderNotConfigured, Translator
-
+from .base import STT, TTS, ProviderNotConfigured, TextGenerator, Translator
 
 def _build_translator(cfg: Config) -> Translator:
     name = cfg.translate_provider
@@ -68,3 +67,27 @@ def get_tts() -> TTS:
 @lru_cache
 def get_stt() -> STT:
     return _build_stt(get_config())
+
+
+def _build_text_generator(cfg: Config) -> TextGenerator:
+    name = cfg.translate_provider
+    if name == "ollama":
+        from .ollama.generate import OllamaTextGenerator
+
+        return OllamaTextGenerator(
+            base_url=cfg.ollama_base_url,
+            model=cfg.ollama_model,
+        )
+    elif name == "fake":
+        from .fake.generate import FakeTextGenerator
+
+        return FakeTextGenerator()
+    else:
+        raise ProviderNotConfigured(
+            f"Text generation requires 'ollama' or 'fake' translate provider, got: {name}"
+        )
+
+
+@lru_cache
+def get_text_generator() -> TextGenerator:
+    return _build_text_generator(get_config())

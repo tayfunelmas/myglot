@@ -30,6 +30,12 @@ class STTResult(BaseModel):
     confidence: float | None = None
 
 
+class TextGenerateResult(BaseModel):
+    title: str
+    body: str
+    vocabulary_md: str
+
+
 class ProviderError(Exception):
     pass
 
@@ -60,3 +66,12 @@ class STT(ABC):
 
     @abstractmethod
     def transcribe(self, audio_bytes: bytes, mime: str, lang: str) -> STTResult: ...
+
+
+class TextGenerator(ABC):
+    name: str
+
+    @abstractmethod
+    def generate(
+        self, instructions: str, source_lang: str, target_lang: str
+    ) -> TextGenerateResult: ...

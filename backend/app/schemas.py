@@ -125,6 +125,25 @@ class PracticeResult(BaseModel):
     diff: list[dict]
 
 
+# --- Generated Texts ---
+class GeneratedTextCreate(BaseModel):
+    instructions: str
+
+
+class GeneratedTextOut(BaseModel):
+    id: int
+    title: str
+    body: str
+    vocabulary_md: str
+    source_lang: str
+    target_lang: str
+    audio_url: str | None = None
+    audio_voice: str | None = None
+    audio_provider: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
 class ReorderRequest(BaseModel):
     item_ids: list[int]
 
